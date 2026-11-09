@@ -56,7 +56,7 @@ psxrecomp_add_game_runtime(psx-runtime
     DEFAULT_GAME_CONFIG_PATH "game.toml"
     MAX_PLAYERS 1
     LAUNCHER_BOXART "${CMAKE_CURRENT_SOURCE_DIR}/launcher_assets/img/boxart.tga"
-    LAUNCHER_BRAND "${CMAKE_CURRENT_SOURCE_DIR}/launcher_assets/img/brand_courier.tga"
+    LAUNCHER_BRAND "${CMAKE_CURRENT_SOURCE_DIR}/launcher_assets/img/brand_icon.tga"
     APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/courier.ico"
     # The game code is GAME.EXE, loaded from the disc by the boot EXE.
     # build.ps1 (psxrecomp_cli generate) compiles it ahead of time from

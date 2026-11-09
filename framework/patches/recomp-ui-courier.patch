@@ -1,9 +1,9 @@
 diff --git a/src/common/backends/imgui/launcher_courier.h b/src/common/backends/imgui/launcher_courier.h
 new file mode 100644
-index 0000000..5d98b56
+index 0000000..478bcdf
 --- /dev/null
 +++ b/src/common/backends/imgui/launcher_courier.h
-@@ -0,0 +1,566 @@
+@@ -0,0 +1,580 @@
 +// launcher_courier.h -- the Courier Crisis "Enhancements" and "Help" pages.
 +//
 +// Included by launcher_imgui.cpp (inside its anonymous namespace) right before
@@ -157,6 +157,10 @@ index 0000000..5d98b56
 +    {"smooth-motion", "rate", "Taxa de saída", "\"Taxa do monitor\" segue a atualização da sua tela."},
 +    {"smooth-motion", "blend", "Mistura", "\"Linear\" mistura por inteiro; \"Adaptativo\" reduz a sombra em movimentos grandes."},
 +    {"smooth-motion", "source", "Origem dos quadros", "\"Flip\" combina com as atualizações de 30 Hz deste jogo."},
++    {"image-filtering", "smoothing", "Suavização", nullptr},
++    {"image-filtering", "texture_filtering", "Filtro de texturas", nullptr},
++    {"image-filtering", "fmv_filtering", "Filtro dos vídeos", nullptr},
++    {"image-filtering", "dithering", "Pontilhado (dithering)", "\"Desligado\" remove o padrão de pontinhos típico do PlayStation."},
 +    {"rewind", "buffer", "Memória de rewind", nullptr},
 +    {"rewind", "interval", "Intervalo", nullptr},
 +};
@@ -228,6 +232,7 @@ index 0000000..5d98b56
 +#define CC_IR "psx.enhancement.internal-resolution"
 +#define CC_PG "psx.enhancement.pgxp"
 +#define CC_EA "psx.enhancement.enhanced-audio"
++#define CC_IF "psx.enhancement.image-filtering"
 +
 +static const CcStep kProfileOriginal[] = {
 +    {CC_W, "widescreen", 0, nullptr, nullptr}, {CC_WE, "wide-edges", 0, nullptr, nullptr},
@@ -235,12 +240,14 @@ index 0000000..5d98b56
 +    {CC_DD, "draw-distance", 1, "distance", "original"}, {CC_F6, "fps60", 0, nullptr, nullptr},
 +    {CC_SM, "smooth-motion", 0, nullptr, nullptr}, {CC_IR, "internal-resolution", 0, nullptr, nullptr},
 +    {CC_PG, "pgxp", 0, nullptr, nullptr}, {CC_EA, "enhanced-audio", 0, nullptr, nullptr},
++    {CC_IF, "image-filtering", 0, nullptr, nullptr},
 +};
 +static const CcStep kProfileRecommended[] = {
 +    {CC_W, "widescreen", 1, "aspect", "16:9"}, {CC_WE, "wide-edges", 1, nullptr, nullptr},
 +    {CC_WS, "wide-sky", 1, nullptr, nullptr}, {CC_HQ, "hq-textures", 1, nullptr, nullptr},
-+    {CC_DD, "draw-distance", 1, "distance", "1.5"}, {CC_F6, "fps60", 1, nullptr, nullptr},
-+    {CC_SM, "smooth-motion", 0, nullptr, nullptr}, {CC_IR, "internal-resolution", 1, "resolution", "4x"},
++    {CC_DD, "draw-distance", 1, "distance", "1.25"}, {CC_F6, "fps60", 1, nullptr, nullptr},
++    {CC_SM, "smooth-motion", 0, nullptr, nullptr}, {CC_IR, "internal-resolution", 1, "resolution", "5x"},
++    {CC_IF, "image-filtering", 1, "dithering", "off"},
 +    {CC_PG, "pgxp", 1, "geometry", "true"}, {CC_PG, "pgxp", 1, "perspective", "true"},
 +    {CC_PG, "pgxp", 1, "cpu_mode", "true"}, {CC_EA, "enhanced-audio", 1, nullptr, nullptr},
 +};
@@ -249,6 +256,7 @@ index 0000000..5d98b56
 +    {CC_WS, "wide-sky", 1, nullptr, nullptr}, {CC_HQ, "hq-textures", 1, nullptr, nullptr},
 +    {CC_DD, "draw-distance", 1, "distance", "3.0"}, {CC_F6, "fps60", 1, nullptr, nullptr},
 +    {CC_SM, "smooth-motion", 1, "blend", "adaptive"}, {CC_IR, "internal-resolution", 1, "resolution", "8x"},
++    {CC_IF, "image-filtering", 1, "dithering", "off"},
 +    {CC_PG, "pgxp", 1, "geometry", "true"}, {CC_PG, "pgxp", 1, "perspective", "true"},
 +    {CC_PG, "pgxp", 1, "cpu_mode", "true"}, {CC_EA, "enhanced-audio", 1, nullptr, nullptr},
 +};
@@ -359,34 +367,40 @@ index 0000000..5d98b56
 +    if (desc && desc[0]) {
 +        ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
 +        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + full - toggle_w - px(24));
++        ImGui::SetWindowFontScale(0.9f);
 +        ImGui::TextWrapped("%s", desc);
++        ImGui::SetWindowFontScale(1.0f);
 +        ImGui::PopTextWrapPos();
 +        ImGui::PopStyleColor();
 +    }
 +
 +    if (f.enabled && f.option_count > 0 && row && (row->expand || row->primary)) {
-+        ImGui::Indent(px(18));
++        ImGui::Indent(px(14));
++        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px(6), px(1.5f)));
++        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(px(8), px(2)));
++        ImGui::SetWindowFontScale(0.86f);
 +        for (int j = 0; j < f.option_count; ++j) {
 +            RecompLauncherCModOption o{};
 +            if (!m->mods->feature_option_get(m->mods->ctx, f.package_id, f.id, j, &o)) continue;
 +            if (!row->expand && std::strcmp(o.id, row->primary)) continue;
 +            if (o.type == RECOMP_MOD_OPTION_BINDING || o.type == RECOMP_MOD_OPTION_TEXT) continue;
 +            cc_localize_option(f, &o);
-+            ImGui::Dummy(ImVec2(0, px(2)));
 +            draw_mod_feature_option(m, f, o);
 +        }
-+        ImGui::Unindent(px(18));
++        ImGui::SetWindowFontScale(1.0f);
++        ImGui::PopStyleVar(2);
++        ImGui::Unindent(px(14));
 +    }
 +    ImGui::PopID();
 +    ImGui::PopID();
 +}
 +
 +static void cc_divider(const LauncherTheme& th) {
-+    ImGui::Dummy(ImVec2(0, px(6)));
++    ImGui::Dummy(ImVec2(0, px(3)));
 +    const ImVec2 p = ImGui::GetCursorScreenPos();
 +    const float w = ImGui::GetContentRegionAvail().x;
 +    ImGui::GetWindowDrawList()->AddLine(p, ImVec2(p.x + w, p.y), imcol(th.border, 0.7f));
-+    ImGui::Dummy(ImVec2(0, px(8)));
++    ImGui::Dummy(ImVec2(0, px(5)));
 +}
 +
 +struct CcListed { RecompLauncherCModFeature f; const CcRow* row; int section; int order; };
@@ -619,7 +633,7 @@ index 0000000..a84ffe1
 +    return head + "\n" + pt("Technical detail: ", "Detalhe técnico: ") + err;
 +}
 diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
-index 43efa98..0d76ca5 100644
+index 43efa98..b8fd015 100644
 --- a/src/common/backends/imgui/launcher_imgui.cpp
 +++ b/src/common/backends/imgui/launcher_imgui.cpp
 @@ -102,6 +102,8 @@ static const char* ui_text(const char* en) {
@@ -652,7 +666,45 @@ index 43efa98..0d76ca5 100644
  void draw_mods(LauncherModel* m, const LauncherTheme& th) {
      const auto* mods = m ? m->mods : nullptr;
      if (!m || (!mods && !m->rom_patch_supported)) return;
-@@ -14579,29 +14584,50 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+@@ -14539,7 +14544,7 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+         const bool own_brand = hprof && hprof->brand && hprof->brand[0];
+         float brand_w = 44.0f, brand_h = 33.0f;
+         if (own_brand && g_brand.h > 0) {
+-            brand_h = 32.0f;
++            brand_h = 48.0f;
+             brand_w = brand_h * (float)g_brand.w / (float)g_brand.h;   // preserve aspect
+             if (brand_w > 130.0f) brand_w = 130.0f;                    // sane upper bound
+         }
+@@ -14558,9 +14563,18 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+         ImGui::SetCursorPosY(hdr_top);
+     }
+     ImGui::BeginGroup();
+-        ImGui::SetWindowFontScale(1.55f);
+-        ImGui::TextUnformatted(m->game_name ? m->game_name : "(null)");
+-        ImGui::SetWindowFontScale(1.0f);
++        {   // A long title shrinks to leave room for the buttons on the right.
++            const char* title = m->game_name ? m->game_name : "(null)";
++            const float reserve = px(m->view == LNG_VIEW_DASHBOARD ? 590.0f : 150.0f);
++            const float avail = ImGui::GetWindowContentRegionMax().x - ImGui::GetCursorPosX() - reserve;
++            const float natural = ImGui::CalcTextSize(title).x;
++            float scale = natural > 1.0f ? avail / natural : 1.55f;
++            if (scale > 1.55f) scale = 1.55f;
++            if (scale < 0.8f) scale = 0.8f;
++            ImGui::SetWindowFontScale(scale);
++            ImGui::TextUnformatted(title);
++            ImGui::SetWindowFontScale(1.0f);
++        }
+         // Platform lockup: the wordmark image when a host supplied one
+         // (SystemProfile.wordmark_image), else the plain platform text.
+         if (g_wordmark.id && g_wordmark.w > 0) {
+@@ -14573,35 +14587,71 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+         }
+     ImGui::EndGroup();
+     {   // right-aligned top-level navigation
+-        const float gap = px(6.0f);
++        const float gap = px(5.0f);
+         const float resume_x = ImGui::GetCursorPosX();
+         const float resume_y = ImGui::GetCursorPosY();
          const float right = ImGui::GetWindowContentRegionMax().x;
          const float y = hdr_top + px(6.0f);
          if (m->view == LNG_VIEW_DASHBOARD) {
@@ -662,17 +714,19 @@ index 43efa98..0d76ca5 100644
 -            const float w = px(110.0f);
 -            const float total = w * count + gap * (count - 1);
 +            struct HdrBtn { const char* label; int kind; };
-+            HdrBtn btns[6]; int count = 0;
++            HdrBtn btns[7]; int count = 0;
++            btns[count++] = {"##lang", 0};
 +            if (m->mods) btns[count++] = {ui_text(launcher_i18n_pair("Enhancements", "Aprimoramentos")), 1};
 +            btns[count++] = {ui_text("Settings"), 2};
 +            if (m->mods) btns[count++] = {ui_text("Mods"), 3};
 +            btns[count++] = {launcher_i18n_pair("Help", "Ajuda"), 4};
 +            if (m->has_assist_tools) btns[count++] = {ui_text("Assist Tools"), 5};
 +            if (m->credits_text && m->credits_text[0]) btns[count++] = {ui_text("Credits"), 6};
-+            float widths[6]; float total = gap * (count - 1);
++            float widths[7]; float total = gap * (count - 1);
 +            for (int i = 0; i < count; ++i) {
-+                widths[i] = ImGui::CalcTextSize(btns[i].label).x + px(30.0f);
-+                if (widths[i] < px(92.0f)) widths[i] = px(92.0f);
++                widths[i] = ImGui::CalcTextSize(btns[i].label).x + px(24.0f);
++                if (widths[i] < px(64.0f)) widths[i] = px(64.0f);
++                if (btns[i].kind == 0) widths[i] = px(116.0f);
 +                total += widths[i];
 +            }
              ImGui::SetCursorPos(ImVec2(right - total, y));
@@ -697,6 +751,19 @@ index 43efa98..0d76ca5 100644
 +                if (i) ImGui::SameLine(0, gap);
 +                const ImVec2 size(widths[i], px(34));
 +                switch (btns[i].kind) {
++                case 0: {
++                    const bool ptl = std::strcmp(launcher_i18n_language(), "pt") == 0;
++                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
++                        ImVec2(px(10.0f), (px(34.0f) - ImGui::GetFontSize()) * 0.5f));
++                    ImGui::SetNextItemWidth(widths[i]);
++                    if (ImGui::BeginCombo("##lang", ptl ? "Português" : "English")) {
++                        if (ImGui::Selectable("Português", ptl)) launcher_i18n_set_language("pt");
++                        if (ImGui::Selectable("English", !ptl)) launcher_i18n_set_language("en");
++                        ImGui::EndCombo();
++                    }
++                    ImGui::PopStyleVar();
++                    break;
++                }
 +                case 1:
 +                    ImGui::PushStyleColor(ImGuiCol_Border, col(th.accent));
 +                    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
@@ -725,7 +792,7 @@ index 43efa98..0d76ca5 100644
              }
          } else {
              const float w = px(110.0f);
-@@ -14677,6 +14703,8 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+@@ -14677,6 +14727,8 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
          case LNG_VIEW_NETPLAY_MODE:   draw_netplay_mode_page(m, th);   break;
          case LNG_VIEW_NETPLAY_SIGNIN: draw_netplay_signin_page(m, th); break;
          case LNG_VIEW_MODS:       draw_mods(m, th);                 break;
@@ -1391,9 +1458,18 @@ index 82955fa..398cfe5 100644
      if (!g_ui) { g_host = nullptr; return 0; }
      return 1;
 diff --git a/src/consoles/psx/psx_profile.h b/src/consoles/psx/psx_profile.h
-index 57f8332..45fc3a3 100644
+index 57f8332..40cff7f 100644
 --- a/src/consoles/psx/psx_profile.h
 +++ b/src/consoles/psx/psx_profile.h
+@@ -143,7 +143,7 @@ static const SystemProfile kSystemProfilePsx = {
+                               "PlayStation disc / SBI (.cue/.bin/.car/.sbi/.chd)" },
+     /* renderer_labels   */ NULL,
+     /* hide_audio_freq   */ 1,       // psxrecomp opens audio at its built-in rate; Volume only
+-    /* brand             */ "brand_psx.tga",
++    /* brand             */ "brand_mark.tga",
+     /* wordmark_image    */ NULL,
+ };
+ 
 @@ -158,7 +158,7 @@ static inline int launcher_console_is_psx(const char* name) {
  // additions, pad-mode locks, disc CRC, callbacks) are set by the host AFTER
  // this.
