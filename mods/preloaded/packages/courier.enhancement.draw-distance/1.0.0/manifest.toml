@@ -1,0 +1,56 @@
+format_version = 5
+id = "courier.enhancement.draw-distance"
+version = "1.0.0"
+name = "Draw Distance"
+author = "local"
+description = "Draws the streets, buildings and cars farther away than the original game."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00442"
+disc_sha256 = "307fd3c7fd3ef5ac61accb3457171947767dfc6a8690f5023ca8230ee5c60127"
+
+[[feature]]
+id = "draw-distance"
+name = "Draw Distance"
+description = "How far the world is drawn. The original game adapts its distance between 2000 and 4000 units; this multiplies that range. Farther means more to draw, so heavy scenes cost more CPU. Applies the next time the game starts."
+group = "Picture"
+default_enabled = true
+
+[[option]]
+feature = "draw-distance"
+id = "distance"
+label = "Draw distance"
+description = "Original keeps the game's own distance. Higher values draw farther (up to 3.0x). Applies the next time the game starts."
+group = "Picture"
+type = "choice"
+default = "original"
+
+[[option.choice]]
+value = "original"
+label = "Original"
+
+[[option.choice]]
+value = "1.25"
+label = "1.25x"
+
+[[option.choice]]
+value = "1.5"
+label = "1.5x"
+
+[[option.choice]]
+value = "2.0"
+label = "2.0x"
+
+[[option.choice]]
+value = "2.5"
+label = "2.5x"
+
+[[option.choice]]
+value = "3.0"
+label = "3.0x"
+
+[[plugin]]
+feature = "draw-distance"
+id = "courier.draw-distance"

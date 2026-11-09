@@ -51,6 +51,7 @@ match_display_max_lines = 2160       # cap at 4K so GPU memory stays sane
 supersampling = 2                    # required for PGXP sub-pixel to show
 geometry_correction = true           # PGXP: removes vertex wobble
 perspective_texturing = true         # perspective-correct UVs
+pgxp_cpu_mode = true                 # PGXP follows the CPU maths that subdivides near polygons
 antialiasing_mode = "fxaa"
 # Smooth motion (frame_generation) tested: artifacts + extra input latency, so
 # it stays off. Crossfade interpolation (PSX_FRAME_INTERPOLATION) is kept as a
@@ -82,6 +83,15 @@ auto_ui_anchor  = "edges"
 # still clamps to 320, so the list went inconsistent and the first level hung
 # on a black screen. They are not render culls: leave this OFF.
 auto_screen_x = false
+# Explicit screen-X sites of the polygon funnels (all identity at 4:3). Each funnel
+# first rejects a quad whose four vertices are all right of 320 or all left of 0, and a
+# second test sends any quad that is not fully inside 0..320 to the clipper, which cuts
+# it at the original screen edge: in 16:9 that cut objects at the edges. The sites below
+# let those tests use the revealed margin instead. Vertical tests are untouched.
+slti_sites = [ "0x80022F50", "0x80022F64", "0x80022F78", "0x80022F8C", "0x800242C4", "0x800242D8", "0x800242EC", "0x80024300", "0x800244C4", "0x800244D8", "0x800244EC", "0x80024500", "0x80024BFC", "0x80024C10", "0x80024C24", "0x80024C38" ]
+screen_x_sites = [ "0x800241D4", "0x800241E8", "0x800241FC", "0x80024210" ]
+bgez_sites = [ "0x80022F08", "0x80022F18", "0x80022F28", "0x800242AC", "0x80024514", "0x80024524", "0x80024534", "0x80024C4C", "0x80024C5C", "0x80024C6C" ]
+bltz_sites = [ "0x80022F38", "0x8002427C", "0x8002428C", "0x8002429C", "0x80024544", "0x80024C7C" ]
 
 # Guest CPU overclock, only while a level is running. The scale charges each
 # instruction 1/N of its cost, so N times as much game code fits between two
@@ -103,3 +113,22 @@ default_mode = "digital"
 require_cue = true
 required_tracks = 1
 required_disc_fp = "592e96968c9525e29305009e56ee18c7abb0de6ada5150930d5fa6ff0b407c1d"
+
+# Always high-detail textures (src/mods/cc_hq_textures_plugin.c): the three
+# face-depth tests `slti v0, v0, 0x19B` in the building renderer. Selector 1 makes
+# every face count as close. Stock behaviour when the mod is off.
+[mod_immediate]
+sites = [
+  { address = "0x80021654", expected = "0x2842019B", group = 1, values = [0x7FFF] },
+  { address = "0x8002167C", expected = "0x2842019B", group = 1, values = [0x7FFF] },
+  { address = "0x800216D0", expected = "0x2842019B", group = 1, values = [0x7FFF] },
+  # Draw distance (src/mods/cc_draw_distance_plugin.c): the game keeps a far distance in
+  # 0x800A0D80 (gp+0x70), adapted every frame inside 2000..4000 by 0x80029480. Selector N scales
+  # both ends of that range by 1.25x..3.0x (1.25, 1.5, 2.0, 2.5, 3.0); selector 0 is the stock game.
+  { address = "0x80029598", expected = "0x284207D0", group = 2, values = [2500, 3000, 4000, 5000, 6000] },  # slti v0,v0,2000 (minimum)
+  { address = "0x800295A0", expected = "0x340207D0", group = 2, values = [2500, 3000, 4000, 5000, 6000] },  # ori  v0,zero,2000 (minimum)
+  { address = "0x800295B8", expected = "0x28420FA1", group = 2, values = [5001, 6001, 8001, 10001, 12001] },  # slti v0,v0,4001 (maximum)
+  { address = "0x800295C0", expected = "0x34020FA0", group = 2, values = [5000, 6000, 8000, 10000, 12000] },  # ori  v0,zero,4000 (maximum)
+  { address = "0x800294C0", expected = "0x34020FA0", group = 2, values = [5000, 6000, 8000, 10000, 12000] },  # ori  v0,zero,4000 (reset)
+  { address = "0x80021910", expected = "0x34020FA0", group = 2, values = [5000, 6000, 8000, 10000, 12000] },  # ori  v0,zero,4000 (renderer init)
+]

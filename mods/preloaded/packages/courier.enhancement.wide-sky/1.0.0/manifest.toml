@@ -1,0 +1,23 @@
+format_version = 5
+id = "courier.enhancement.wide-sky"
+version = "1.0.0"
+name = "Widescreen Sky"
+author = "local"
+description = "Stretches the sky and the ground gradient to fill the whole widescreen picture."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00442"
+disc_sha256 = "307fd3c7fd3ef5ac61accb3457171947767dfc6a8690f5023ca8230ee5c60127"
+
+[[feature]]
+id = "wide-sky"
+name = "Widescreen Sky"
+description = "The sky is built from tiles that cover exactly the original 320 pixels, so a 16:9 picture shows an empty strip at each side. This spreads the tiles across the full width."
+group = "Picture"
+default_enabled = true
+
+[[plugin]]
+feature = "wide-sky"
+id = "courier.wide-sky"

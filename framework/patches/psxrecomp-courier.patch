@@ -21,6 +21,69 @@ index 9b937a0c..a81003b4 100644
  void psx_muldiv_set(CPUState *cpu, uint32_t latency) {
      overlay_flush_cycles();
      if (g_cbs.muldiv_set) g_cbs.muldiv_set(cpu, latency);
+diff --git a/runtime/src/pgxp.cpp b/runtime/src/pgxp.cpp
+index 6eb0abeb..32343bc5 100644
+--- a/runtime/src/pgxp.cpp
++++ b/runtime/src/pgxp.cpp
+@@ -64,6 +64,11 @@ enum {
+     PGXP_F_DX = 1u << 4,
+     PGXP_F_DY = 1u << 5,
+     PGXP_F_UNCLAMPED = 1u << 6, /* exact GTE projection; intact word only */
++    /* A half-word load of a vertex that carried depth: `z` is that vertex's
++     * depth, valid for the whole word only once both halves are stored back
++     * from the same vertex (see SH). Games that build GP0 packets by copying
++     * lhu/sh pairs out of a GTE scratch array would otherwise lose it. */
++    PGXP_F_HZ = 1u << 7,
+     PGXP_F_VXY = PGXP_F_VX | PGXP_F_VY,
+ };
+ 
+@@ -729,6 +734,10 @@ extern "C" void psx_pgxp_load(struct CPUState *cpu, uint32_t instr,
+                 dst->flags |= PGXP_F_VX;
+                 if (src->flags & (hi_half ? PGXP_F_DY : PGXP_F_DX))
+                     dst->flags |= PGXP_F_DX;
++                if ((src->flags & PGXP_F_VZ) && src->z != 0) {
++                    dst->z = src->z;
++                    dst->flags |= PGXP_F_HZ;
++                }
+             }
+         }
+         return;
+@@ -785,6 +794,8 @@ extern "C" void psx_pgxp_store(struct CPUState *cpu, uint32_t instr,
+     case 0x29: {                               /* SH                          */
+         int hi_half = (addr >> 1) & 1;
+         uint32_t half = value & 0xFFFFu;
++        const int old_hz = dst->gen == s_gen && (dst->flags & PGXP_F_HZ) != 0;
++        const uint16_t old_z = old_hz ? dst->z : 0;
+         if (dst->gen != s_gen) pv_reset(dst, half << (hi_half ? 16 : 0));
+         /* Patch the stored half into the tracked word; the other half's
+          * validity (if any) survives untouched. Depth never survives a
+@@ -792,7 +803,7 @@ extern "C" void psx_pgxp_store(struct CPUState *cpu, uint32_t instr,
+         if (hi_half) dst->value = (dst->value & 0x0000FFFFu) | (half << 16);
+         else         dst->value = (dst->value & 0xFFFF0000u) | half;
+         dst->flags &= (uint16_t)~((hi_half ? (PGXP_F_VY | PGXP_F_DY) : (PGXP_F_VX | PGXP_F_DX)) |
+-                                  PGXP_F_VZ | PGXP_F_PROJECTION | PGXP_F_UNCLAMPED);
++                                  PGXP_F_VZ | PGXP_F_HZ | PGXP_F_PROJECTION | PGXP_F_UNCLAMPED);
+         dst->z = 0;
+         int ok = 0, derived = 0;
+         int32_t v16 = 0;
+@@ -812,6 +823,17 @@ extern "C" void psx_pgxp_store(struct CPUState *cpu, uint32_t instr,
+             const uint16_t d = (src->flags & PGXP_F_DX) ? (hi_half ? PGXP_F_DY : PGXP_F_DX) : 0;
+             if (hi_half) { dst->y16 = src->x16; dst->flags |= (uint16_t)(PGXP_F_VY | d); }
+             else         { dst->x16 = src->x16; dst->flags |= (uint16_t)(PGXP_F_VX | d); }
++            /* Depth rides along when this half came from a vertex that had it
++             * (lhu keeps it in the register shadow). It becomes the word's depth
++             * only when the other half was stored from a vertex with the same
++             * depth; until then it is only pending. */
++            if ((src->flags & PGXP_F_HZ) && src->z != 0) {
++                const uint16_t other = hi_half ? PGXP_F_VX : PGXP_F_VY;
++                dst->z = src->z;
++                dst->flags |= PGXP_F_HZ;
++                if (old_hz && old_z == src->z && (dst->flags & other))
++                    dst->flags |= PGXP_F_VZ;
++            }
+         }
+         note_store(0x29, rt, src, addr, half, dst);
+         return;
 diff --git a/tools/compile_overlays.py b/tools/compile_overlays.py
 index 82b2ed99..0cf5c986 100644
 --- a/tools/compile_overlays.py

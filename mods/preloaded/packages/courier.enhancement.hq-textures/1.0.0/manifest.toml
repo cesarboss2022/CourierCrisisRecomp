@@ -1,0 +1,23 @@
+format_version = 5
+id = "courier.enhancement.hq-textures"
+version = "1.0.0"
+name = "Always High-Detail Textures"
+author = "local"
+description = "Keeps the buildings on their close-up, high-detail textures at any distance, instead of switching when you get near."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00442"
+disc_sha256 = "307fd3c7fd3ef5ac61accb3457171947767dfc6a8690f5023ca8230ee5c60127"
+
+[[feature]]
+id = "hq-textures"
+name = "Always High-Detail Textures"
+description = "The game swaps building textures for sharper ones when you come close. This keeps the sharp ones at every distance. Applies the next time the game starts. Draws more detail, so heavy scenes cost a little more CPU."
+group = "Picture"
+default_enabled = true
+
+[[plugin]]
+feature = "hq-textures"
+id = "courier.hq-textures"

@@ -46,6 +46,8 @@ Inside the game, **F10** opens the options menu: display, audio, system, frame r
 | | Aspect ratio | 16:9 | The picture fills a wide screen, with the HUD and menus kept in place |
 | | Anti-aliasing | FXAA | Smoother edges |
 | | Image filtering | Configurable | Texture filtering and dithering, under Mods |
+| | High-detail textures | On | Buildings keep their sharp close-up textures at any distance, instead of swapping when you get near |
+| | Draw distance | Original | Draws the world farther, from 1.25x to 3.0x. Needs a restart |
 | **Motion** | 60 FPS gameplay | On | Levels run at up to 60 FPS instead of 30. Game speed does not change |
 | | Smooth motion | Off | Adds in-between frames, **experimental** |
 | **World** | Sub-pixel geometry (PGXP) | On | Steadies the polygon edges that wobble on the PlayStation |

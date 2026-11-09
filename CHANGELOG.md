@@ -2,6 +2,16 @@
 
 What changed in each release.
 
+## Unreleased
+
+### Enhancements
+
+- Always High-Detail Textures: buildings keep their sharp close-up textures at any distance (on by default, applies at the next start)
+- Draw Distance: draws the world farther, Original, 1.25x, 1.5x, 2.0x, 2.5x or 3.0x (applies at the next start)
+- PGXP now keeps the depth of each vertex through the game's half-word copies, so perspective-correct textures work on the world, and it follows the CPU maths that subdivides near polygons: about 87% of triangles are sub-pixel precise, up from 53%, with less texture shake
+
+- Widescreen edges: polygons in the revealed side bands are no longer dropped or cut at the original 320-pixel edge, and the sky and ground gradient now fill the full width
+
 ## v0.1.0
 
 ### Enhancements

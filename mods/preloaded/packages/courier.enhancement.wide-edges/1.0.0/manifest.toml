@@ -1,0 +1,23 @@
+format_version = 5
+id = "courier.enhancement.wide-edges"
+version = "1.0.0"
+name = "Widescreen Edge Fix"
+author = "local"
+description = "Stops objects near the left and right edges of a widescreen picture from being dropped and popping in."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00442"
+disc_sha256 = "307fd3c7fd3ef5ac61accb3457171947767dfc6a8690f5023ca8230ee5c60127"
+
+[[feature]]
+id = "wide-edges"
+name = "Widescreen Edge Fix"
+description = "The game hides objects that its 4:3 screen test thinks are covered by nearer ones. That test only knows the original 320 pixels, so in 16:9 objects at the edges can vanish and pop in. This draws them instead. Applies the next time the game starts."
+group = "Picture"
+default_enabled = true
+
+[[plugin]]
+feature = "wide-edges"
+id = "courier.wide-edges"
