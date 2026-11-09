@@ -70,6 +70,13 @@ psxrecomp_add_game_runtime(psx-runtime
     CODEGEN_SETUP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
 )
 
+# The launcher's About page shows this.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" CC_VERSION_TEXT LIMIT_COUNT 1)
+if(NOT CC_VERSION_TEXT)
+    set(CC_VERSION_TEXT "dev")
+endif()
+target_compile_definitions(psx-runtime PRIVATE "CC_GAME_VERSION=\"${CC_VERSION_TEXT}\"")
+
 # Compile the trusted mod plugins into the game executable.
 if(CC_MOD_PLUGIN_SOURCES)
     target_sources(psx-runtime PRIVATE ${CC_MOD_PLUGIN_SOURCES})

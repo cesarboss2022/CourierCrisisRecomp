@@ -1,3 +1,739 @@
+diff --git a/src/common/backends/imgui/launcher_courier.h b/src/common/backends/imgui/launcher_courier.h
+new file mode 100644
+index 0000000..5d98b56
+--- /dev/null
++++ b/src/common/backends/imgui/launcher_courier.h
+@@ -0,0 +1,566 @@
++// launcher_courier.h -- the Courier Crisis "Enhancements" and "Help" pages.
++//
++// Included by launcher_imgui.cpp (inside its anonymous namespace) right before
++// draw_mods(), so it can use the launcher's own helpers (px, col, imcol,
++// ui_text, begin_panel, eyebrow, change_mod_feature, draw_mod_feature_option).
++//
++// The Enhancements page is DATA DRIVEN: it walks the mod provider's features
++// and presents each one the way kCcRows describes (section, plain-language name
++// and description in English and Portuguese, which option to show inline).
++// A feature that is not in kCcRows still appears, under "Other", with the
++// provider's own name and text, so a new mod is never hidden by this page.
++#pragma once
++
++// ---- curated feature table --------------------------------------------------
++enum CcSection { CC_PICTURE = 0, CC_MOTION, CC_AUDIO, CC_FILTERS, CC_EXTRA, CC_ADVANCED, CC_OTHER, CC_SECTION_COUNT };
++
++struct CcRow {
++    const char* pkg;
++    const char* feat;
++    int         section;
++    const char* name_en;
++    const char* name_pt;
++    const char* desc_en;
++    const char* desc_pt;
++    bool        expand;      // show every option under the switch
++    const char* primary;     // else: only this option (may be nullptr = none)
++    const char* linked_pkg;  // hidden feature that follows this switch
++    const char* linked_feat;
++    const char* linked_pkg2;
++    const char* linked_feat2;
++};
++
++static const CcRow kCcRows[] = {
++    // ---- Picture
++    {"courier.enhancement.widescreen", "widescreen", CC_PICTURE,
++     "Widescreen", "Tela ampla (widescreen)",
++     "Widens the game view for 16:9 and 21:9 screens, with the edge and sky fixes. Videos and menus stay 4:3.",
++     "Amplia a visão do jogo para telas 16:9 e 21:9, com os ajustes de bordas e céu. Vídeos e menus continuam em 4:3.",
++     false, "aspect",
++     "courier.enhancement.wide-edges", "wide-edges", "courier.enhancement.wide-sky", "wide-sky"},
++    {"psx.enhancement.internal-resolution", "internal-resolution", CC_PICTURE,
++     "Internal resolution", "Resolução interna",
++     "Draws the 3D picture at a higher resolution for a sharper image. Higher costs more graphics memory.",
++     "Desenha o 3D em resolução maior, deixando a imagem mais nítida. Quanto maior, mais memória de vídeo usa.",
++     false, "resolution", nullptr, nullptr, nullptr, nullptr},
++    {"courier.enhancement.hq-textures", "hq-textures", CC_PICTURE,
++     "Always high-detail textures", "Texturas sempre em alta definição",
++     "Keeps the detailed building textures at any distance instead of switching to the simple ones.",
++     "Mantém as texturas detalhadas dos prédios em qualquer distância, sem trocar pelas versões simples.",
++     false, nullptr, nullptr, nullptr, nullptr, nullptr},
++    {"courier.enhancement.draw-distance", "draw-distance", CC_PICTURE,
++     "Draw distance", "Distância de desenho",
++     "How far the streets, buildings and cars are drawn. Farther means more work for the CPU.",
++     "Até onde ruas, prédios e carros são desenhados. Quanto mais longe, mais trabalho para o processador.",
++     false, "distance", nullptr, nullptr, nullptr, nullptr},
++    {"psx.enhancement.pgxp", "pgxp", CC_PICTURE,
++     "PGXP precision", "Precisão PGXP",
++     "Steadier polygons and undistorted textures. Fixes the wobbling of walls and streets while you move.",
++     "Polígonos mais firmes e texturas sem distorção. Corrige o \"chacoalhar\" de paredes e ruas ao se mover.",
++     true, nullptr, nullptr, nullptr, nullptr, nullptr},
++    // ---- Motion
++    {"courier.enhancement.fps60", "fps60", CC_MOTION,
++     "60 FPS", "60 FPS",
++     "Runs the levels at up to 60 frames per second instead of the original 30. Game speed does not change.",
++     "Roda as fases a até 60 quadros por segundo em vez dos 30 originais. A velocidade do jogo não muda.",
++     false, nullptr, nullptr, nullptr, nullptr, nullptr},
++    {"courier.enhancement.smooth-motion", "smooth-motion", CC_MOTION,
++     "Smooth motion", "Movimento suave",
++     "Blends the game's frames to your monitor's refresh rate. Can leave a faint double image on fast objects.",
++     "Mistura os quadros do jogo na taxa do seu monitor. Pode deixar uma leve sombra em objetos rápidos.",
++     true, nullptr, nullptr, nullptr, nullptr, nullptr},
++    // ---- Audio
++    {"psx.enhancement.enhanced-audio", "enhanced-audio", CC_AUDIO,
++     "Enhanced audio", "Áudio aprimorado",
++     "Higher quality sound processing for music and effects.",
++     "Processamento de som de maior qualidade para música e efeitos.",
++     false, nullptr, nullptr, nullptr, nullptr, nullptr},
++    // ---- Filters
++    {"psx.enhancement.image-filtering", "image-filtering", CC_FILTERS,
++     "Image filtering", "Filtro de imagem",
++     "Smoothing of textures, videos and dithering patterns.",
++     "Suavização de texturas, vídeos e do padrão de pontilhado.",
++     true, nullptr, nullptr, nullptr, nullptr, nullptr},
++    {"psx.enhancement.post-processing", "post-processing", CC_FILTERS,
++     "Post-processing", "Pós-processamento",
++     "Anti-aliasing, bloom and shaders applied on top of the picture.",
++     "Suavização de bordas, brilho (bloom) e shaders aplicados sobre a imagem.",
++     true, nullptr, nullptr, nullptr, nullptr, nullptr},
++    {"psx.enhancement.crt-filter", "crt-filter", CC_FILTERS,
++     "CRT filter", "Filtro de TV de tubo (CRT)",
++     "Imitates an old CRT television, with scanlines.",
++     "Imita uma TV de tubo antiga, com linhas de varredura.",
++     true, nullptr, nullptr, nullptr, nullptr, nullptr},
++    {"psx.presentation.bezel", "bezel", CC_FILTERS,
++     "Bezel artwork", "Moldura decorativa",
++     "Draws artwork around the picture.",
++     "Desenha uma arte ao redor da imagem.",
++     false, nullptr, nullptr, nullptr, nullptr, nullptr},
++    // ---- Extras
++    {"psx.feature.rewind", "rewind", CC_EXTRA,
++     "Rewind", "Voltar o tempo (rewind)",
++     "Hold a key in the game to go back a few seconds.",
++     "Segure uma tecla no jogo para voltar alguns segundos.",
++     true, nullptr, nullptr, nullptr, nullptr, nullptr},
++    // ---- Advanced
++    {"psx.enhancement.hd-textures", "hd-textures", CC_ADVANCED,
++     "HD texture packs", "Pacotes de texturas HD",
++     "Replaces textures with packs you installed yourself.",
++     "Troca texturas por pacotes que você mesmo instalou.",
++     false, nullptr, nullptr, nullptr, nullptr, nullptr},
++    {"psx.enhancement.8mb-ram", "8mb-ram", CC_ADVANCED,
++     "8 MB main memory", "8 MB de memória principal",
++     "Doubles the console's memory. Only for modding.",
++     "Dobra a memória do console. Apenas para modificações.",
++     false, nullptr, nullptr, nullptr, nullptr, nullptr},
++    {"psx.integration.debug-server", "debug-server", CC_ADVANCED,
++     "Debug server", "Servidor de depuração",
++     "Opens a local network port for developer tools. Leave it off when playing.",
++     "Abre uma porta de rede local para ferramentas de desenvolvedor. Deixe desligado para jogar.",
++     false, nullptr, nullptr, nullptr, nullptr, nullptr},
++};
++
++// Features that follow another switch and are never listed by themselves.
++static bool cc_is_linked_child(const char* pkg, const char* feat) {
++    for (const CcRow& r : kCcRows) {
++        if (r.linked_feat && !std::strcmp(r.linked_feat, feat) && !std::strcmp(r.linked_pkg, pkg)) return true;
++        if (r.linked_feat2 && !std::strcmp(r.linked_feat2, feat) && !std::strcmp(r.linked_pkg2, pkg)) return true;
++    }
++    return false;
++}
++
++static const CcRow* cc_row_for(const char* pkg, const char* feat) {
++    for (const CcRow& r : kCcRows)
++        if (!std::strcmp(r.feat, feat) && !std::strcmp(r.pkg, pkg)) return &r;
++    return nullptr;
++}
++
++// ---- option text (labels and notes the manifests only have in English) ------
++struct CcOptText {
++    const char* feat; const char* opt;
++    const char* label_pt; const char* desc_pt;
++};
++static const CcOptText kCcOptText[] = {
++    {"widescreen", "aspect", "Formato", "\"Ajustar à janela\" acompanha o tamanho da janela, de 4:3 até 21:9."},
++    {"internal-resolution", "resolution", "Resolução", "1x é a nativa; 4x é o padrão. Valores altos exigem mais da placa de vídeo."},
++    {"draw-distance", "distance", "Distância", "\"Original\" mantém a distância do jogo. Valores maiores desenham mais longe e pesam no processador."},
++    {"pgxp", "geometry", "Correção da geometria", "Usa posições com precisão de sub-pixel para reduzir o tremor dos polígonos."},
++    {"pgxp", "perspective", "Texturas em perspectiva", "Corrige a deformação das texturas, independentemente da geometria."},
++    {"pgxp", "cpu_mode", "Propagar pela CPU", "Acompanha a precisão também nas contas da CPU. Cobre mais vértices do jogo."},
++    {"pgxp", "culling", "Descarte preciso", "Decide quais faces são descartadas com a mesma precisão. Pode mudar o que aparece ao longe."},
++    {"smooth-motion", "rate", "Taxa de saída", "\"Taxa do monitor\" segue a atualização da sua tela."},
++    {"smooth-motion", "blend", "Mistura", "\"Linear\" mistura por inteiro; \"Adaptativo\" reduz a sombra em movimentos grandes."},
++    {"smooth-motion", "source", "Origem dos quadros", "\"Flip\" combina com as atualizações de 30 Hz deste jogo."},
++    {"rewind", "buffer", "Memória de rewind", nullptr},
++    {"rewind", "interval", "Intervalo", nullptr},
++};
++
++static void cc_localize_option(const RecompLauncherCModFeature& f, RecompLauncherCModOption* o) {
++    if (std::strcmp(launcher_i18n_language(), "pt") != 0) return;
++    for (const CcOptText& t : kCcOptText) {
++        if (std::strcmp(t.feat, f.id) || std::strcmp(t.opt, o->id)) continue;
++        if (t.label_pt) std::snprintf(o->label, sizeof(o->label), "%s", t.label_pt);
++        if (t.desc_pt) std::snprintf(o->description, sizeof(o->description), "%s", t.desc_pt);
++        return;
++    }
++}
++
++// ---- provider access --------------------------------------------------------
++static bool cc_find_feature(const LauncherModel* m, const char* pkg, const char* feat,
++                            RecompLauncherCModFeature* out) {
++    const auto* mods = m ? m->mods : nullptr;
++    if (!mods || !mods->feature_count || !mods->feature_get) return false;
++    for (int i = 0, n = mods->feature_count(mods->ctx); i < n; ++i) {
++        RecompLauncherCModFeature f{};
++        if (mods->feature_get(mods->ctx, i, &f) && !std::strcmp(f.id, feat) &&
++            !std::strcmp(f.package_id, pkg)) {
++            *out = f;
++            return true;
++        }
++    }
++    return false;
++}
++
++static bool cc_get_option(const LauncherModel* m, const RecompLauncherCModFeature& f,
++                          const char* opt, char* out, size_t cap) {
++    const auto* mods = m->mods;
++    for (int j = 0; j < f.option_count; ++j) {
++        RecompLauncherCModOption o{};
++        if (mods->feature_option_get(mods->ctx, f.package_id, f.id, j, &o) && !std::strcmp(o.id, opt)) {
++            std::snprintf(out, cap, "%s", o.value);
++            return true;
++        }
++    }
++    return false;
++}
++
++static void cc_enable(LauncherModel* m, const char* pkg, const char* feat, bool on) {
++    RecompLauncherCModFeature f{};
++    if (!cc_find_feature(m, pkg, feat, &f)) return;
++    if (f.enabled == (on ? 1 : 0)) return;
++    if (!launcher_mod_enable_feature(m, &f, on ? 1 : 0)) mod_note_error(m);
++}
++
++static void cc_option(LauncherModel* m, const char* pkg, const char* feat, const char* opt, const char* val) {
++    RecompLauncherCModFeature f{};
++    if (!cc_find_feature(m, pkg, feat, &f)) return;
++    char cur[RECOMP_LAUNCHER_MOD_VALUE_MAX];
++    if (cc_get_option(m, f, opt, cur, sizeof(cur)) && !std::strcmp(cur, val)) return;
++    if (!m->mods->feature_set_option(m->mods->ctx, pkg, feat, opt, val)) mod_note_error(m);
++}
++
++// ---- profiles ---------------------------------------------------------------
++struct CcStep { const char* pkg; const char* feat; int enabled; const char* opt; const char* val; };
++
++#define CC_W  "courier.enhancement.widescreen"
++#define CC_WE "courier.enhancement.wide-edges"
++#define CC_WS "courier.enhancement.wide-sky"
++#define CC_HQ "courier.enhancement.hq-textures"
++#define CC_DD "courier.enhancement.draw-distance"
++#define CC_F6 "courier.enhancement.fps60"
++#define CC_SM "courier.enhancement.smooth-motion"
++#define CC_IR "psx.enhancement.internal-resolution"
++#define CC_PG "psx.enhancement.pgxp"
++#define CC_EA "psx.enhancement.enhanced-audio"
++
++static const CcStep kProfileOriginal[] = {
++    {CC_W, "widescreen", 0, nullptr, nullptr}, {CC_WE, "wide-edges", 0, nullptr, nullptr},
++    {CC_WS, "wide-sky", 0, nullptr, nullptr}, {CC_HQ, "hq-textures", 0, nullptr, nullptr},
++    {CC_DD, "draw-distance", 1, "distance", "original"}, {CC_F6, "fps60", 0, nullptr, nullptr},
++    {CC_SM, "smooth-motion", 0, nullptr, nullptr}, {CC_IR, "internal-resolution", 0, nullptr, nullptr},
++    {CC_PG, "pgxp", 0, nullptr, nullptr}, {CC_EA, "enhanced-audio", 0, nullptr, nullptr},
++};
++static const CcStep kProfileRecommended[] = {
++    {CC_W, "widescreen", 1, "aspect", "16:9"}, {CC_WE, "wide-edges", 1, nullptr, nullptr},
++    {CC_WS, "wide-sky", 1, nullptr, nullptr}, {CC_HQ, "hq-textures", 1, nullptr, nullptr},
++    {CC_DD, "draw-distance", 1, "distance", "1.5"}, {CC_F6, "fps60", 1, nullptr, nullptr},
++    {CC_SM, "smooth-motion", 0, nullptr, nullptr}, {CC_IR, "internal-resolution", 1, "resolution", "4x"},
++    {CC_PG, "pgxp", 1, "geometry", "true"}, {CC_PG, "pgxp", 1, "perspective", "true"},
++    {CC_PG, "pgxp", 1, "cpu_mode", "true"}, {CC_EA, "enhanced-audio", 1, nullptr, nullptr},
++};
++static const CcStep kProfileMaximum[] = {
++    {CC_W, "widescreen", 1, "aspect", "16:9"}, {CC_WE, "wide-edges", 1, nullptr, nullptr},
++    {CC_WS, "wide-sky", 1, nullptr, nullptr}, {CC_HQ, "hq-textures", 1, nullptr, nullptr},
++    {CC_DD, "draw-distance", 1, "distance", "3.0"}, {CC_F6, "fps60", 1, nullptr, nullptr},
++    {CC_SM, "smooth-motion", 1, "blend", "adaptive"}, {CC_IR, "internal-resolution", 1, "resolution", "8x"},
++    {CC_PG, "pgxp", 1, "geometry", "true"}, {CC_PG, "pgxp", 1, "perspective", "true"},
++    {CC_PG, "pgxp", 1, "cpu_mode", "true"}, {CC_EA, "enhanced-audio", 1, nullptr, nullptr},
++};
++
++struct CcProfile {
++    const char* name_en; const char* name_pt;
++    const char* note_en; const char* note_pt;
++    const CcStep* steps; int count;
++};
++static const CcProfile kCcProfiles[] = {
++    {"Original", "Original",
++     "As the PlayStation ran it", "Como rodava no PlayStation",
++     kProfileOriginal, (int)(sizeof(kProfileOriginal) / sizeof(kProfileOriginal[0]))},
++    {"Recommended", "Recomendado",
++     "Widescreen, 60 FPS, sharp picture", "Widescreen, 60 FPS, imagem nítida",
++     kProfileRecommended, (int)(sizeof(kProfileRecommended) / sizeof(kProfileRecommended[0]))},
++    {"Maximum", "Máximo",
++     "Everything up; needs a fast PC", "Tudo no alto; exige um PC rápido",
++     kProfileMaximum, (int)(sizeof(kProfileMaximum) / sizeof(kProfileMaximum[0]))},
++};
++
++static void cc_apply_profile(LauncherModel* m, const CcProfile& p) {
++    for (int i = 0; i < p.count; ++i) {
++        const CcStep& s = p.steps[i];
++        if (s.enabled >= 0) cc_enable(m, s.pkg, s.feat, s.enabled != 0);
++        if (s.opt) cc_option(m, s.pkg, s.feat, s.opt, s.val);
++    }
++    if (m->has_bios && m->bios_verify_for_rom_cb) launcher_model_refresh_bios_status(m);
++}
++
++static bool cc_profile_matches(const LauncherModel* m, const CcProfile& p) {
++    for (int i = 0; i < p.count; ++i) {
++        const CcStep& s = p.steps[i];
++        RecompLauncherCModFeature f{};
++        if (!cc_find_feature(m, s.pkg, s.feat, &f)) continue;   // not in this build
++        if (s.enabled >= 0 && (f.enabled != 0) != (s.enabled != 0)) return false;
++        if (s.opt && s.enabled != 0) {
++            char cur[RECOMP_LAUNCHER_MOD_VALUE_MAX];
++            if (!cc_get_option(m, f, s.opt, cur, sizeof(cur)) || std::strcmp(cur, s.val)) return false;
++        }
++    }
++    return true;
++}
++
++// -1 = custom
++static int cc_current_profile(const LauncherModel* m) {
++    for (int i = 0; i < 3; ++i)
++        if (cc_profile_matches(m, kCcProfiles[i])) return i;
++    return -1;
++}
++
++static const char* cc_profile_name(int idx) {
++    if (idx < 0) return launcher_i18n_pair("Custom", "Personalizado");
++    return launcher_i18n_pair(kCcProfiles[idx].name_en, kCcProfiles[idx].name_pt);
++}
++
++// ---- widgets ----------------------------------------------------------------
++static bool cc_toggle(const char* id, bool* v, const LauncherTheme& th) {
++    const float h = ImGui::GetFrameHeight() * 0.82f;
++    const float w = h * 1.85f;
++    const ImVec2 p = ImGui::GetCursorScreenPos();
++    ImGui::InvisibleButton(id, ImVec2(w, h));
++    const bool hovered = ImGui::IsItemHovered();
++    bool changed = false;
++    if (ImGui::IsItemClicked()) { *v = !*v; changed = true; }
++    ImDrawList* dl = ImGui::GetWindowDrawList();
++    const ImU32 bg = *v ? imcol(th.accent, hovered ? 1.0f : 0.92f)
++                        : imcol(th.control_hovered, hovered ? 1.0f : 0.85f);
++    dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), bg, h * 0.5f);
++    dl->AddRect(p, ImVec2(p.x + w, p.y + h), imcol(th.border, 0.9f), h * 0.5f);
++    const float r = h * 0.5f - 3.0f;
++    const float cx = *v ? p.x + w - h * 0.5f : p.x + h * 0.5f;
++    dl->AddCircleFilled(ImVec2(cx, p.y + h * 0.5f), r,
++                        *v ? ImGui::GetColorU32(ImVec4(0.08f, 0.07f, 0.05f, 1.0f))
++                           : imcol(th.text_muted, 1.0f));
++    return changed;
++}
++
++static bool cc_show_advanced = false;
++
++static void cc_draw_row(LauncherModel* m, const LauncherTheme& th, const RecompLauncherCModFeature& f,
++                        const CcRow* row) {
++    const bool pt = std::strcmp(launcher_i18n_language(), "pt") == 0;
++    const char* name = row ? (pt ? row->name_pt : row->name_en) : f.name;
++    const char* desc = row ? (pt ? row->desc_pt : row->desc_en) : f.description;
++    ImGui::PushID(f.package_id);
++    ImGui::PushID(f.id);
++
++    const float full = ImGui::GetContentRegionAvail().x;
++    const float toggle_w = ImGui::GetFrameHeight() * 0.82f * 1.85f;
++    const float row_top = ImGui::GetCursorPosY();
++    ImGui::TextUnformatted(name);
++    if (f.has_error) {
++        ImGui::SameLine();
++        ImGui::TextColored(col(th.warn), "!");
++        if (ImGui::IsItemHovered() && f.status[0]) ImGui::SetTooltip("%s", f.status);
++    }
++    ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + full - toggle_w, row_top));
++    bool on = f.enabled != 0;
++    if (cc_toggle("##on", &on, th)) {
++        change_mod_feature(m, f, on);
++        if (row) {
++            if (row->linked_feat) cc_enable(m, row->linked_pkg, row->linked_feat, on);
++            if (row->linked_feat2) cc_enable(m, row->linked_pkg2, row->linked_feat2, on);
++        }
++    }
++    ImGui::SetCursorPosY(row_top + ImGui::GetFrameHeight() * 0.82f + px(3));
++    if (desc && desc[0]) {
++        ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
++        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + full - toggle_w - px(24));
++        ImGui::TextWrapped("%s", desc);
++        ImGui::PopTextWrapPos();
++        ImGui::PopStyleColor();
++    }
++
++    if (f.enabled && f.option_count > 0 && row && (row->expand || row->primary)) {
++        ImGui::Indent(px(18));
++        for (int j = 0; j < f.option_count; ++j) {
++            RecompLauncherCModOption o{};
++            if (!m->mods->feature_option_get(m->mods->ctx, f.package_id, f.id, j, &o)) continue;
++            if (!row->expand && std::strcmp(o.id, row->primary)) continue;
++            if (o.type == RECOMP_MOD_OPTION_BINDING || o.type == RECOMP_MOD_OPTION_TEXT) continue;
++            cc_localize_option(f, &o);
++            ImGui::Dummy(ImVec2(0, px(2)));
++            draw_mod_feature_option(m, f, o);
++        }
++        ImGui::Unindent(px(18));
++    }
++    ImGui::PopID();
++    ImGui::PopID();
++}
++
++static void cc_divider(const LauncherTheme& th) {
++    ImGui::Dummy(ImVec2(0, px(6)));
++    const ImVec2 p = ImGui::GetCursorScreenPos();
++    const float w = ImGui::GetContentRegionAvail().x;
++    ImGui::GetWindowDrawList()->AddLine(p, ImVec2(p.x + w, p.y), imcol(th.border, 0.7f));
++    ImGui::Dummy(ImVec2(0, px(8)));
++}
++
++struct CcListed { RecompLauncherCModFeature f; const CcRow* row; int section; int order; };
++
++static void draw_enhancements(LauncherModel* m, const LauncherTheme& th) {
++    const auto* mods = m ? m->mods : nullptr;
++    if (!m || !mods || !mods->feature_count || !mods->feature_get || !mods->feature_option_get ||
++        !mods->feature_enable || !mods->feature_set_option) return;
++    const bool pt = std::strcmp(launcher_i18n_language(), "pt") == 0;
++
++    // Profiles -------------------------------------------------------------
++    eyebrow("PROFILE");
++    ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
++    ImGui::TextUnformatted(launcher_i18n_pair(
++        "Changes are saved at once and apply the next time the game starts.",
++        "As mudanças são salvas na hora e valem na próxima vez que o jogo for iniciado."));
++    ImGui::PopStyleColor();
++    ImGui::Dummy(ImVec2(0, px(6)));
++    const int current = cc_current_profile(m);
++    {
++        const float gap = px(10);
++        const float cw = (ImGui::GetContentRegionAvail().x - gap * 2) / 3.0f;
++        for (int i = 0; i < 3; ++i) {
++            if (i) ImGui::SameLine(0, gap);
++            const bool active = (i == current);
++            ImGui::PushID(i);
++            if (active) {
++                ImGui::PushStyleColor(ImGuiCol_Button, col(th.accent_dim));
++                ImGui::PushStyleColor(ImGuiCol_Border, col(th.accent));
++                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
++            }
++            char label[256];
++            std::snprintf(label, sizeof(label), "%s\n%s",
++                          pt ? kCcProfiles[i].name_pt : kCcProfiles[i].name_en,
++                          pt ? kCcProfiles[i].note_pt : kCcProfiles[i].note_en);
++            if (ImGui::Button(label, ImVec2(cw, px(58)))) cc_apply_profile(m, kCcProfiles[i]);
++            if (active) { ImGui::PopStyleVar(); ImGui::PopStyleColor(2); }
++            ImGui::PopID();
++        }
++    }
++    ImGui::PushStyleColor(ImGuiCol_Text, col(current >= 0 ? th.good : th.text_muted));
++    ImGui::Dummy(ImVec2(0, px(2)));
++    ImGui::Text("%s: %s", launcher_i18n_pair("Current profile", "Perfil atual"), cc_profile_name(current));
++    ImGui::PopStyleColor();
++    if (m->mod_status[0]) {
++        ImGui::PushStyleColor(ImGuiCol_Text, col(th.warn));
++        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
++        ImGui::TextWrapped("%s", m->mod_status);
++        ImGui::PopTextWrapPos();
++        ImGui::PopStyleColor();
++    }
++    ImGui::Dummy(ImVec2(0, px(10)));
++
++    // Gather every listed feature, in table order -----------------------------
++    std::vector<CcListed> items;
++    for (int i = 0, n = mods->feature_count(mods->ctx); i < n; ++i) {
++        CcListed it{};
++        if (!mods->feature_get(mods->ctx, i, &it.f) || !launcher_mod_feature_listed(mods, &it.f)) continue;
++        if (cc_is_linked_child(it.f.package_id, it.f.id)) continue;
++        if (it.f.hidden && !cc_row_for(it.f.package_id, it.f.id)) continue;   // internal helpers
++        it.row = cc_row_for(it.f.package_id, it.f.id);
++        it.section = it.row ? it.row->section : CC_OTHER;
++        it.order = it.row ? (int)(it.row - kCcRows) : 1000 + i;
++        items.push_back(it);
++    }
++    std::stable_sort(items.begin(), items.end(),
++                     [](const CcListed& a, const CcListed& b) { return a.order < b.order; });
++
++    static const char* kTitleEn[CC_SECTION_COUNT] = {"PICTURE", "MOTION", "AUDIO", "FILTERS AND EFFECTS", "EXTRAS", "ADVANCED", "OTHER"};
++    static const char* kTitlePt[CC_SECTION_COUNT] = {"IMAGEM", "MOVIMENTO", "ÁUDIO", "FILTROS E EFEITOS", "EXTRAS", "AVANÇADO", "OUTROS"};
++
++    for (int s = 0; s < CC_SECTION_COUNT; ++s) {
++        int count = 0;
++        for (const CcListed& it : items) if (it.section == s) ++count;
++        if (!count) continue;
++        if (s == CC_ADVANCED) {
++            if (ImGui::Button(cc_show_advanced
++                    ? launcher_i18n_pair("Hide advanced options", "Ocultar opções avançadas")
++                    : launcher_i18n_pair("Show advanced options", "Mostrar opções avançadas")))
++                cc_show_advanced = !cc_show_advanced;
++            ImGui::Dummy(ImVec2(0, px(6)));
++            if (!cc_show_advanced) continue;
++        }
++        char pid[32];
++        std::snprintf(pid, sizeof(pid), "cc_sec_%d", s);
++        if (begin_panel(pid)) {
++            ImGui::TextColored(col(th.accent2), "%s", pt ? kTitlePt[s] : kTitleEn[s]);
++            ImGui::Dummy(ImVec2(0, px(4)));
++            bool first = true;
++            for (const CcListed& it : items) {
++                if (it.section != s) continue;
++                if (!first) cc_divider(th);
++                first = false;
++                cc_draw_row(m, th, it.f, it.row);
++            }
++        }
++        end_panel();
++        ImGui::Dummy(ImVec2(0, px(8)));
++    }
++}
++
++// ---- Help and About ------------------------------------------------------------
++#ifndef CC_PROJECT_URL
++#define CC_PROJECT_URL "https://github.com/cesarboss2022/CourierCrisisRecomp"
++#endif
++
++static void cc_bullet(const char* en, const char* ptx, const LauncherTheme& th) {
++    ImGui::PushStyleColor(ImGuiCol_Text, col(th.text));
++    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
++    ImGui::Bullet();
++    ImGui::TextWrapped("%s", launcher_i18n_pair(en, ptx));
++    ImGui::PopTextWrapPos();
++    ImGui::PopStyleColor();
++}
++
++static void draw_help(LauncherModel* m, const LauncherTheme& th) {
++    const bool pt = std::strcmp(launcher_i18n_language(), "pt") == 0;
++    if (begin_panel("cc_help_about")) {
++        ImGui::TextColored(col(th.accent2), "%s", launcher_i18n_pair("ABOUT", "SOBRE"));
++        ImGui::Dummy(ImVec2(0, px(4)));
++        ImGui::TextUnformatted("Courier Crisis Recompiled");
++#ifdef CC_GAME_VERSION
++        ImGui::SameLine();
++        ImGui::TextColored(col(th.text_muted), "v%s", CC_GAME_VERSION);
++#endif
++        ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
++        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
++        ImGui::TextWrapped("%s", launcher_i18n_pair(
++            "A native PC port of Courier Crisis (PlayStation, 1999) made by recompiling the game with PSXRecomp. "
++            "No game data is included: you bring your own disc.",
++            "Uma versão nativa para PC do Courier Crisis (PlayStation, 1999), feita ao recompilar o jogo com o PSXRecomp. "
++            "Nenhum dado do jogo vem junto: você usa o seu próprio disco."));
++        ImGui::PopTextWrapPos();
++        ImGui::PopStyleColor();
++        ImGui::Dummy(ImVec2(0, px(4)));
++        ImGui::TextLinkOpenURL(launcher_i18n_pair("Project page and releases", "Página do projeto e versões"),
++                               CC_PROJECT_URL);
++        ImGui::TextLinkOpenURL(launcher_i18n_pair("Report a problem", "Relatar um problema"),
++                               CC_PROJECT_URL "/issues");
++    }
++    end_panel();
++    ImGui::Dummy(ImVec2(0, px(8)));
++
++    if (begin_panel("cc_help_start")) {
++        ImGui::TextColored(col(th.accent2), "%s", launcher_i18n_pair("GETTING STARTED", "COMO COMEÇAR"));
++        ImGui::Dummy(ImVec2(0, px(4)));
++        cc_bullet("Pick your Courier Crisis (USA, SLUS-00442) disc image on the main page. It must show \"Disc verified\".",
++                  "Escolha a imagem do seu disco Courier Crisis (USA, SLUS-00442) na tela inicial. Ela deve aparecer como \"Disco verificado\".", th);
++        cc_bullet("Open Enhancements and choose a profile (Original, Recommended or Maximum), then fine-tune anything you like.",
++                  "Abra Aprimoramentos e escolha um perfil (Original, Recomendado ou Máximo); depois ajuste o que quiser.", th);
++        cc_bullet("Press PLAY. Changes to enhancements apply each time the game starts.",
++                  "Aperte JOGAR. As mudanças nos aprimoramentos valem a cada vez que o jogo inicia.", th);
++        cc_bullet("In the game, F10 opens the menu to change options without leaving.",
++                  "No jogo, F10 abre o menu para mudar opções sem sair.", th);
++    }
++    end_panel();
++    ImGui::Dummy(ImVec2(0, px(8)));
++
++    if (begin_panel("cc_help_trouble")) {
++        ImGui::TextColored(col(th.accent2), "%s", launcher_i18n_pair("IF SOMETHING GOES WRONG", "SE ALGO DER ERRADO"));
++        ImGui::Dummy(ImVec2(0, px(4)));
++        cc_bullet("\"Not available in this executable\": an old CourierCrisis_Recompiled.exe is open. Use the newest release.",
++                  "\"Não faz parte deste executável\": um CourierCrisis_Recompiled.exe antigo está aberto. Use a versão mais recente.", th);
++        cc_bullet("Heavy scenes slow down: lower Draw distance, Internal resolution or turn Smooth motion off.",
++                  "Cenas pesadas ficam lentas: reduza Distância de desenho, Resolução interna ou desligue Movimento suave.", th);
++        cc_bullet("Picture glitches at the edges in widescreen: leave Widescreen on 16:9 and keep the profile switch on.",
++                  "Falhas nas bordas em widescreen: deixe o Widescreen em 16:9 e mantenha o perfil ativado.", th);
++        cc_bullet("Still stuck? Send the file startup log and your PC model to the project page.",
++                  "Ainda com problema? Envie o log de inicialização e o modelo do seu PC na página do projeto.", th);
++    }
++    end_panel();
++    ImGui::Dummy(ImVec2(0, px(8)));
++
++    if (begin_panel("cc_help_lang")) {
++        ImGui::TextColored(col(th.accent2), "%s", launcher_i18n_pair("LANGUAGE", "IDIOMA"));
++        ImGui::Dummy(ImVec2(0, px(4)));
++        if (ImGui::RadioButton("Português (Brasil)", pt)) launcher_i18n_set_language("pt");
++        ImGui::SameLine();
++        if (ImGui::RadioButton("English", !pt)) launcher_i18n_set_language("en");
++    }
++    end_panel();
++    (void)m;
++}
+diff --git a/src/common/backends/imgui/launcher_courier_text.h b/src/common/backends/imgui/launcher_courier_text.h
+new file mode 100644
+index 0000000..a84ffe1
+--- /dev/null
++++ b/src/common/backends/imgui/launcher_courier_text.h
+@@ -0,0 +1,42 @@
++// launcher_courier_text.h -- plain-language messages for the Courier Crisis
++// launcher. Included by launcher_imgui.cpp; depends only on the standard
++// library and launcher_i18n.h.
++#pragma once
++#include <cstdio>
++#include <cstring>
++#include <string>
++
++// Turns a provider/runtime error into something a player can act on, keeping
++// the original text after it for bug reports. Unknown errors pass through.
++static std::string courier_friendly_error(const char* raw) {
++    const std::string err = raw && raw[0] ? raw : "";
++    auto pt = [](const char* en, const char* pt_) {
++        return std::string(launcher_i18n_pair(en, pt_));
++    };
++    std::string head;
++    const char* trusted = std::strstr(err.c_str(), "trusted plugin is unavailable");
++    if (trusted) {
++        const char* colon = std::strchr(trusted, ':');
++        std::string id = colon ? colon + 1 : "";
++        while (!id.empty() && (id.front() == ' ')) id.erase(id.begin());
++        head = pt("The enhancement \"", "O aprimoramento \"") + id +
++               pt("\" is not part of this game executable. This happens when an old "
++                  "CourierCrisis_Recompiled.exe is opened next to newer files. "
++                  "Download the latest release and open the new executable.",
++                  "\" não faz parte deste executável. Isso acontece quando um "
++                  "CourierCrisis_Recompiled.exe antigo é aberto junto de arquivos "
++                  "novos. Baixe a versão mais recente e abra o executável novo.");
++    } else if (std::strstr(err.c_str(), "disc") && std::strstr(err.c_str(), "not")) {
++        head = pt("The disc image was not accepted. Use your own Courier Crisis (USA, "
++                  "SLUS-00442) image in .cue/.bin or .chd format.",
++                  "A imagem do disco não foi aceita. Use a sua própria imagem do "
++                  "Courier Crisis (USA, SLUS-00442) em .cue/.bin ou .chd.");
++    } else if (std::strstr(err.c_str(), "BIOS") || std::strstr(err.c_str(), "bios")) {
++        head = pt("The BIOS could not be used. Press \"Use OpenBIOS\" on the Settings "
++                  "page or pick your own BIOS file.",
++                  "Não foi possível usar a BIOS. Use o botão \"Usar OpenBIOS\" em "
++                  "Configurações ou escolha o seu arquivo de BIOS.");
++    }
++    if (head.empty()) return err.empty() ? std::string() : err;
++    return head + "\n" + pt("Technical detail: ", "Detalhe técnico: ") + err;
++}
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+index 43efa98..0d76ca5 100644
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -102,6 +102,8 @@ static const char* ui_text(const char* en) {
+     return launcher_i18n_text(en);
+ }
+ 
++#include "launcher_courier_text.h"
++
+ struct ShaderPresetEntry {
+     std::string label;
+     std::string path;
+@@ -11599,8 +11601,9 @@ static bool mod_feature_text_matches(const char* search,
+ static void mod_note_error(LauncherModel* m) {
+     const auto* mods = m ? m->mods : nullptr;
+     const char* error = mods && mods->last_error ? mods->last_error(mods->ctx) : nullptr;
+-    std::snprintf(m->mod_status, sizeof(m->mod_status), "%s",
+-                  error && error[0] ? error : "The mod operation failed.");
++    const std::string friendly = courier_friendly_error(
++        error && error[0] ? error : "The mod operation failed.");
++    std::snprintf(m->mod_status, sizeof(m->mod_status), "%s", friendly.c_str());
+ }
+ 
+ static bool mod_commit_launch(LauncherModel* m) {
+@@ -12883,6 +12886,8 @@ static void draw_quick_mods(LauncherModel* m,const LauncherTheme& th) {
+     (void)th;
+ }
+ 
++#include "launcher_courier.h"
++
+ void draw_mods(LauncherModel* m, const LauncherTheme& th) {
+     const auto* mods = m ? m->mods : nullptr;
+     if (!m || (!mods && !m->rom_patch_supported)) return;
+@@ -14579,29 +14584,50 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+         const float right = ImGui::GetWindowContentRegionMax().x;
+         const float y = hdr_top + px(6.0f);
+         if (m->view == LNG_VIEW_DASHBOARD) {
+-            const int count = 1 + (m->mods ? 1 : 0) +
+-                              (m->has_assist_tools ? 1 : 0) +
+-                              ((m->credits_text && m->credits_text[0]) ? 1 : 0);
+-            const float w = px(110.0f);
+-            const float total = w * count + gap * (count - 1);
++            struct HdrBtn { const char* label; int kind; };
++            HdrBtn btns[6]; int count = 0;
++            if (m->mods) btns[count++] = {ui_text(launcher_i18n_pair("Enhancements", "Aprimoramentos")), 1};
++            btns[count++] = {ui_text("Settings"), 2};
++            if (m->mods) btns[count++] = {ui_text("Mods"), 3};
++            btns[count++] = {launcher_i18n_pair("Help", "Ajuda"), 4};
++            if (m->has_assist_tools) btns[count++] = {ui_text("Assist Tools"), 5};
++            if (m->credits_text && m->credits_text[0]) btns[count++] = {ui_text("Credits"), 6};
++            float widths[6]; float total = gap * (count - 1);
++            for (int i = 0; i < count; ++i) {
++                widths[i] = ImGui::CalcTextSize(btns[i].label).x + px(30.0f);
++                if (widths[i] < px(92.0f)) widths[i] = px(92.0f);
++                total += widths[i];
++            }
+             ImGui::SetCursorPos(ImVec2(right - total, y));
+-            if (ImGui::Button(ui_text("Settings"), ImVec2(w, px(34))))
+-                launcher_model_set_view(m, LNG_VIEW_SETTINGS);
+-            if (m->mods) {
+-                ImGui::SameLine(0, gap);
+-                if (rui_mods_button(launcher_model_can_open_mods(m),
+-                                    ui_text("Mods"), ImVec2(w, px(34))))
+-                    launcher_model_set_view(m, LNG_VIEW_MODS);
+-            }
+-            if (m->has_assist_tools) {
+-                ImGui::SameLine(0, gap);
+-                if (ImGui::Button(ui_text("Assist Tools"), ImVec2(w, px(34))))
+-                    launcher_model_set_view(m, LNG_VIEW_ASSIST_TOOLS);
+-            }
+-            if (m->credits_text && m->credits_text[0]) {
+-                ImGui::SameLine(0, gap);
+-                if (ImGui::Button(ui_text("Credits"), ImVec2(w, px(34))))
+-                    launcher_model_set_view(m, LNG_VIEW_CREDITS);
++            for (int i = 0; i < count; ++i) {
++                if (i) ImGui::SameLine(0, gap);
++                const ImVec2 size(widths[i], px(34));
++                switch (btns[i].kind) {
++                case 1:
++                    ImGui::PushStyleColor(ImGuiCol_Border, col(th.accent));
++                    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
++                    if (rui_mods_button(launcher_model_can_open_mods(m), btns[i].label, size))
++                        launcher_model_set_view(m, LNG_VIEW_ENHANCEMENTS);
++                    ImGui::PopStyleVar();
++                    ImGui::PopStyleColor();
++                    break;
++                case 2:
++                    if (ImGui::Button(btns[i].label, size)) launcher_model_set_view(m, LNG_VIEW_SETTINGS);
++                    break;
++                case 3:
++                    if (rui_mods_button(launcher_model_can_open_mods(m), btns[i].label, size))
++                        launcher_model_set_view(m, LNG_VIEW_MODS);
++                    break;
++                case 4:
++                    if (ImGui::Button(btns[i].label, size)) launcher_model_set_view(m, LNG_VIEW_HELP);
++                    break;
++                case 5:
++                    if (ImGui::Button(btns[i].label, size)) launcher_model_set_view(m, LNG_VIEW_ASSIST_TOOLS);
++                    break;
++                default:
++                    if (ImGui::Button(btns[i].label, size)) launcher_model_set_view(m, LNG_VIEW_CREDITS);
++                    break;
++                }
+             }
+         } else {
+             const float w = px(110.0f);
+@@ -14677,6 +14703,8 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+         case LNG_VIEW_NETPLAY_MODE:   draw_netplay_mode_page(m, th);   break;
+         case LNG_VIEW_NETPLAY_SIGNIN: draw_netplay_signin_page(m, th); break;
+         case LNG_VIEW_MODS:       draw_mods(m, th);                 break;
++        case LNG_VIEW_ENHANCEMENTS: draw_enhancements(m, th);        break;
++        case LNG_VIEW_HELP:       draw_help(m, th);                 break;
+         case LNG_VIEW_ASSIST_TOOLS: draw_assist_tools(m, th);        break;
+         case LNG_VIEW_CREDITS:      draw_credits(m, th);             break;
+         case LNG_VIEW_LOBBY:        draw_lobby(m, th);               break;
 diff --git a/src/common/backends/imgui/runtime_ui_imgui.cpp b/src/common/backends/imgui/runtime_ui_imgui.cpp
 index dcd0ad4..1b2df20 100644
 --- a/src/common/backends/imgui/runtime_ui_imgui.cpp
@@ -108,6 +844,274 @@ index dcd0ad4..1b2df20 100644
          }
          if (editing_this && enabled) {
              const float field_w = touch_friendly
+diff --git a/src/common/launcher_i18n.cpp b/src/common/launcher_i18n.cpp
+index 91a6c97..3587c60 100644
+--- a/src/common/launcher_i18n.cpp
++++ b/src/common/launcher_i18n.cpp
+@@ -1,6 +1,11 @@
+ #include "launcher_i18n.h"
+ 
++#include <cstdio>
+ #include <cstring>
++#if defined(_WIN32)
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#endif
+ 
+ #ifndef RECOMP_UI_LANGUAGE
+ #define RECOMP_UI_LANGUAGE "en"
+@@ -205,6 +210,146 @@ static const LauncherI18nEntry kItalian[] = {
+     {"No patch selected", "Nessuna patch selezionata"},
+ };
+ 
++static const LauncherI18nEntry kPortuguese[] = {
++    {"Settings", "Configurações"},
++    {"Mods", "Mods"},
++    {"Assist Tools", "Ferramentas"},
++    {"Credits", "Créditos"},
++    {"< Back", "< Voltar"},
++    {"Install", "Instalar"},
++    {"Install Mod Package", "Instalar pacote de mod"},
++    {"Package installed. Changes apply when you press PLAY.",
++     "Pacote instalado. As mudanças valem ao pressionar JOGAR."},
++    {"Disable all", "Desativar tudo"},
++    {"Disable every installed mod feature", "Desativa todas as funções de mod instaladas"},
++    {"Search features, groups, packages...", "Buscar funções, grupos, pacotes..."},
++    {"General", "Geral"},
++    {"No matching features.", "Nenhuma função encontrada."},
++    {"No mod features installed.", "Nenhuma função de mod instalada."},
++    {"Disable", "Desativar"},
++    {"Enable", "Ativar"},
++    {"From", "De"},
++    {"Source: ", "Origem: "},
++    {"Project page", "Página do projeto"},
++    {"Files", "Arquivos"},
++    {"(optional)", "(opcional)"},
++    {"Not selected", "Não selecionado"},
++    {"Change folder", "Trocar pasta"},
++    {"Change file", "Trocar arquivo"},
++    {"Select folder", "Escolher pasta"},
++    {"Select file", "Escolher arquivo"},
++    {"Configuration", "Configuração"},
++    {"Install or select a feature to configure it.",
++     "Instale ou selecione uma função para configurá-la."},
++    {"Skip launcher on boot", "Pular o launcher ao iniciar"},
++    {"Restore Defaults", "Restaurar padrões"},
++    {"Refresh", "Atualizar"},
++    {"Browse For", "Procurar"},
++    {"Browse", "Procurar"},
++    {"New", "Novo"},
++    {"Configure", "Configurar"},
++    {"Enabled", "Ativado"},
++    {"connected", "conectado"},
++    {"not assigned", "não atribuído"},
++    {"PLAY", "JOGAR"},
++    {"RESUME", "CONTINUAR"},
++    {"QUIT GAME", "SAIR DO JOGO"},
++    {"Disc", "Disco"},
++    {"Memory Card", "Memory card"},
++    {"Serial", "Serial"},
++    {"Region", "Região"},
++    {"ISO header", "Cabeçalho ISO"},
++    {"File", "Arquivo"},
++    {"Tracks", "Faixas"},
++    {"OK", "OK"},
++    {"Mismatch", "Divergente"},
++    {"No disc selected", "Nenhum disco selecionado"},
++    {"Disc verified", "Disco verificado"},
++    {"Disc verified (warnings)", "Disco verificado (avisos)"},
++    {"Disc verification failed", "Falha na verificação do disco"},
++    {"Disc not recognized", "Disco não reconhecido"},
++    {"Copy details", "Copiar detalhes"},
++    {"None", "Nenhum"},
++    {"Keyboard + Mouse", "Teclado + mouse"},
++    {"Keyboard", "Teclado"},
++    {"Controller", "Controle"},
++    {"(disconnected)", "(desconectado)"},
++    {"(no gamepad connected)", "(nenhum controle conectado)"},
++    {"PLAYER", "JOGADOR"},
++    {"CONTROLLER", "CONTROLE"},
++    {"CONTROLLER - PLAYER", "CONTROLE - JOGADOR"},
++    {"Input source", "Origem da entrada"},
++    {"Rename Gamepad", "Renomear controle"},
++    {"Delete Gamepad", "Excluir controle"},
++    {"Cancel", "Cancelar"},
++    {"Deadzone", "Zona morta"},
++    {"DISPLAY", "VÍDEO"},
++    {"AUDIO", "ÁUDIO"},
++    {"HOTKEYS", "ATALHOS"},
++    {"SYSTEM", "SISTEMA"},
++    {"INPUT", "ENTRADA"},
++    {"ONLINE", "ONLINE"},
++    {"CREDITS", "CRÉDITOS"},
++    {"SAVES", "SAVES"},
++    {"Window scale", "Escala da janela"},
++    {"Window size", "Tamanho da janela"},
++    {"Fullscreen", "Tela cheia"},
++    {"Screen layout", "Layout da tela"},
++    {"Integer scaling", "Escala inteira"},
++    {"Scaling filter", "Filtro de escala"},
++    {"Linear filtering", "Filtro linear"},
++    {"Texture filtering", "Filtro de texturas"},
++    {"Renderer", "Renderizador"},
++    {"Supersampling", "Supersampling"},
++    {"Internal resolution", "Resolução interna"},
++    {"Native", "Nativa"},
++    {"Match display", "Igual ao monitor"},
++    {"Antialiasing", "Suavização de bordas"},
++    {"FMV filtering", "Filtro dos vídeos"},
++    {"Perspective textures", "Texturas em perspectiva"},
++    {"Frame interpolation", "Interpolação de quadros"},
++    {"VSync", "VSync"},
++    {"Skip FMVs", "Pular vídeos"},
++    {"Rewind", "Voltar o tempo"},
++    {"Volume", "Volume"},
++    {"Output device", "Dispositivo de saída"},
++    {"Language", "Idioma"},
++    {"(system default)", "(padrão do sistema)"},
++    {"BIOS", "BIOS"},
++    {"Use OpenBIOS", "Usar OpenBIOS"},
++    {"Clear", "Limpar"},
++    {"Edit", "Editar"},
++    {"Save", "Salvar"},
++    {"Browse...", "Procurar..."},
++    {"Optimize FMV Playback", "Otimizar reprodução dos vídeos"},
++    {"Features", "Funções"},
++    {"Installed packages", "Pacotes instalados"},
++    {"Player name", "Nome do jogador"},
++    {"Off", "Desligado"},
++    {"On", "Ligado"},
++    {"Borderless", "Sem bordas"},
++    {"Exclusive", "Exclusivo"},
++    {"Default", "Padrão"},
++    {"Adaptive", "Adaptativo"},
++    {"Display refresh", "Taxa do monitor"},
++    {"Software", "Software"},
++    {"OpenGL", "OpenGL"},
++    {"Reset", "Reiniciar"},
++    {"Pause", "Pausar"},
++    {"Fast-forward", "Avançar rápido"},
++    {"Window bigger", "Janela maior"},
++    {"Window smaller", "Janela menor"},
++    {"Volume up", "Aumentar volume"},
++    {"Volume down", "Diminuir volume"},
++    {"FPS readout", "Mostrar FPS"},
++    {"Toggle renderer", "Trocar renderizador"},
++    {"Save states menu", "Menu de save states"},
++    {"Open launcher", "Abrir launcher"},
++    {"Render thread", "Thread de renderização"},
++    {"Present thread", "Thread de apresentação"},
++    {"PROFILE", "PERFIL"},
++};
++
+ static const char* lookup(const LauncherI18nEntry* entries, int count,
+                           const char* english) {
+     if (!english) return "";
+@@ -215,21 +360,59 @@ static const char* lookup(const LauncherI18nEntry* entries, int count,
+     return english;
+ }
+ 
++// The language is chosen at run time: an explicit choice saved by the launcher
++// (launcher-language.txt next to the executable) wins, then the OS language,
++// then RECOMP_UI_LANGUAGE, then English.
++static char g_language[16] = "";
++
++static void language_set_internal(const char* lang) {
++    std::snprintf(g_language, sizeof(g_language), "%s", lang ? lang : "en");
++}
++
++static void language_init(void) {
++    if (g_language[0]) return;
++    if (FILE* f = std::fopen("launcher-language.txt", "rb")) {
++        char buf[16] = {0};
++        size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
++        std::fclose(f);
++        buf[n] = 0;
++        if (!std::strncmp(buf, "pt", 2)) { language_set_internal("pt"); return; }
++        if (!std::strncmp(buf, "en", 2)) { language_set_internal("en"); return; }
++    }
++#if defined(_WIN32)
++    wchar_t loc[85] = {0};
++    if (GetUserDefaultLocaleName(loc, 85) > 0 && loc[0] == L'p' && loc[1] == L't') {
++        language_set_internal("pt");
++        return;
++    }
++#endif
++    if (!std::strncmp(RECOMP_UI_LANGUAGE, "pt", 2)) { language_set_internal("pt"); return; }
++    if (!std::strncmp(RECOMP_UI_LANGUAGE, "it", 2)) { language_set_internal("it"); return; }
++    language_set_internal("en");
++}
++
++void launcher_i18n_set_language(const char* lang) {
++    language_set_internal(lang);
++    if (FILE* f = std::fopen("launcher-language.txt", "wb")) {
++        std::fputs(g_language, f);
++        std::fclose(f);
++    }
++}
++
+ const char* launcher_i18n_language(void) {
+-    return RECOMP_UI_LANGUAGE;
++    language_init();
++    return g_language;
++}
++
++const char* launcher_i18n_pair(const char* english, const char* portuguese) {
++    return std::strcmp(launcher_i18n_language(), "pt") == 0 ? portuguese : english;
+ }
+ 
+ const char* launcher_i18n_text(const char* english) {
+     const char* language = launcher_i18n_language();
+-    if (!language || language[0] == '\0' ||
+-        std::strcmp(language, "en") == 0 ||
+-        std::strcmp(language, "en-US") == 0) {
+-        return english ? english : "";
+-    }
+-    if (std::strcmp(language, "it") == 0 ||
+-        std::strcmp(language, "it-IT") == 0) {
+-        return lookup(kItalian, (int)(sizeof(kItalian) / sizeof(kItalian[0])),
+-                      english);
+-    }
++    if (std::strcmp(language, "it") == 0)
++        return lookup(kItalian, (int)(sizeof(kItalian) / sizeof(kItalian[0])), english);
++    if (std::strcmp(language, "pt") == 0)
++        return lookup(kPortuguese, (int)(sizeof(kPortuguese) / sizeof(kPortuguese[0])), english);
+     return english ? english : "";
+ }
+diff --git a/src/common/launcher_i18n.h b/src/common/launcher_i18n.h
+index 4f8c2f1..bdc74dc 100644
+--- a/src/common/launcher_i18n.h
++++ b/src/common/launcher_i18n.h
+@@ -2,3 +2,6 @@
+ 
+ const char* launcher_i18n_language(void);
+ const char* launcher_i18n_text(const char* english);
++
++void launcher_i18n_set_language(const char* lang);   // "en" or "pt"; saved
++const char* launcher_i18n_pair(const char* english, const char* portuguese);
+diff --git a/src/common/launcher_model.h b/src/common/launcher_model.h
+index 10c4065..8aa40d7 100644
+--- a/src/common/launcher_model.h
++++ b/src/common/launcher_model.h
+@@ -59,6 +59,9 @@ typedef enum {
+      * skipped entirely when this client is already signed in or when the
+      * server offers no logins -- see draw_netplay_mode_page. */
+     LNG_VIEW_NETPLAY_SIGNIN,
++    /* Courier Crisis: the Enhancements page and the Help/About page. */
++    LNG_VIEW_ENHANCEMENTS,
++    LNG_VIEW_HELP,
+     /* Keep last. launcher_model_set_view validates against this rather than
+      * against the last real view, which is what silently swallowed the two
+      * views above when they were first added. */
+@@ -386,7 +389,7 @@ typedef struct {
+     int       mod_package_selected;
+     bool      mod_show_packages;
+     char      mod_search[96];
+-    char      mod_status[256];
++    char      mod_status[768];
+     bool      rom_patch_supported;
+     const char* rom_patch_note;
+     const char* rom_patch_cache_dir;
 diff --git a/src/common/launcher_theme.h b/src/common/launcher_theme.h
 index 317e920..9f2fd7c 100644
 --- a/src/common/launcher_theme.h
