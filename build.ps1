@@ -42,4 +42,4 @@ python $Cli rebuild --config game.toml --project-root . --build-dir $BuildDir --
 if ($LASTEXITCODE -ne 0) { throw 'rebuild failed' }
 
 Write-Host ''
-Write-Host "Done: $BuildDir\CourierCrisis_Recompiled.exe"
+Write-Host "Done: $BuildDir (start the game with .\run.ps1)"

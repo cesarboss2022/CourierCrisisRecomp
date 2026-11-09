@@ -50,6 +50,9 @@ psxrecomp_add_game_runtime(psx-runtime
     # perspective-correct textures to have any effect.
     PGXP
     WINDOW_TITLE "Courier Crisis Recompiled"
+    # Without this the executable is named after the window title
+    # (Courier_Crisis_Recompiled.exe); the release docs and smoke test use this name.
+    EXE_NAME "CourierCrisis_Recompiled"
     DEFAULT_GAME_CONFIG_PATH "game.toml"
     MAX_PLAYERS 1
     LAUNCHER_BOXART "${CMAKE_CURRENT_SOURCE_DIR}/launcher_assets/img/boxart.tga"

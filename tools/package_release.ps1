@@ -26,6 +26,12 @@ $env:PATH = "$(Split-Path -Parent $bash);$gitRoot\usr\bin;$env:PATH"
 $env:PSX_RELEASE_STAGE_PYTHON = (Get-Command python).Source -replace '\\', '/'
 $env:RELEASE_VERSION = $Version
 
+# The runtime is named after the window title (Courier_Crisis_Recompiled.exe) and the packager
+# renames it. A CourierCrisis_Recompiled.exe left in build-dist by an older build would be packed
+# instead of the fresh one, so remove it first.
+Remove-Item (Join-Path $Root 'build-dist/CourierCrisis_Recompiled.exe') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $Root 'build-dist/CourierCrisis_Recompiled.execution.json') -ErrorAction SilentlyContinue
+
 python psxrecomp/psxrecomp_cli.py rebuild --config game.toml --project-root . `
     --build-dir build-dist --no-pgo `
     --cmake-extra=-DPSX_RELEASE_CHANNEL=public `

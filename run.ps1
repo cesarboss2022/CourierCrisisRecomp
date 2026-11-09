@@ -11,8 +11,12 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $Root = $PSScriptRoot
-$Runtime = Join-Path $Root "$BuildDir/CourierCrisis_Recompiled.exe"
-if (!(Test-Path $Runtime)) { throw "CourierCrisis_Recompiled.exe was not found in $BuildDir. Run .\build.ps1 first." }
+# A local build is named after the window title (Courier_Crisis_Recompiled.exe); the release
+# package renames it to CourierCrisis_Recompiled.exe. Take the newest one in the build folder.
+$Exe = Get-ChildItem (Join-Path $Root $BuildDir) -Filter 'Courier*_Recompiled.exe' -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (!$Exe) { throw "No Courier*_Recompiled.exe was found in $BuildDir. Run .\build.ps1 first." }
+$Runtime = $Exe.FullName
 
 $GameArguments = @()
 if ($Disc) {
