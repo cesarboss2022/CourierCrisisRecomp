@@ -2,15 +2,23 @@
 
 What changed in each release.
 
-## Unreleased
+## v0.2.0
 
 ### Enhancements
 
 - Always High-Detail Textures: buildings keep their sharp close-up textures at any distance (on by default, applies at the next start)
 - Draw Distance: draws the world farther, Original, 1.25x, 1.5x, 2.0x, 2.5x or 3.0x (applies at the next start)
-- PGXP now keeps the depth of each vertex through the game's half-word copies, so perspective-correct textures work on the world, and it follows the CPU maths that subdivides near polygons: about 87% of triangles are sub-pixel precise, up from 53%, with less texture shake
+- Better PGXP: the game's world now gets perspective-correct textures, and the polygons the game subdivides near the camera are tracked too. About 87% of triangles are sub-pixel precise, up from 53%, with less texture shake
+- Widescreen: objects in the side bands are no longer dropped or cut at the original 320-pixel edge, and the sky and the ground gradient fill the full width
 
-- Widescreen edges: polygons in the revealed side bands are no longer dropped or cut at the original 320-pixel edge, and the sky and ground gradient now fill the full width
+### Fixes
+
+- The v0.1.0 package was packed from an older executable than the one it was built with. This release is packed from the current build
+
+### Known limitations
+
+- The campaign is not fully tested yet, see [STATUS.md](docs/STATUS.md)
+- A higher draw distance means more to draw: heavy scenes cost more CPU
 
 ## v0.1.0
 
