@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/cesarboss2022/CourierCrisisRecomp/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/cesarboss2022/CourierCrisisRecomp/build.yml?label=build" alt="Build"></a>
-  <a href="https://github.com/cesarboss2022/CourierCrisisRecomp/releases"><img src="https://img.shields.io/github/v/release/cesarboss2022/CourierCrisisRecomp?include_prereleases&label=release" alt="Release"></a>
+  <a href="https://github.com/cesarboss2022/CourierCrisisRecomp/releases"><img src="https://img.shields.io/github/v/release/cesarboss2022/CourierCrisisRecomp" alt="Release"></a>
   <a href="https://github.com/cesarboss2022/CourierCrisisRecomp/releases"><img src="https://img.shields.io/github/downloads/cesarboss2022/CourierCrisisRecomp/total" alt="Downloads"></a>
   <a href="https://github.com/cesarboss2022/CourierCrisisRecomp/releases"><img src="https://img.shields.io/badge/platform-Windows%20x64-1a231b" alt="Windows x64"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/cesarboss2022/CourierCrisisRecomp"><img src="https://img.shields.io/ossf-scorecard/github.com/cesarboss2022/CourierCrisisRecomp?label=OpenSSF" alt="OpenSSF Scorecard"></a>
