@@ -1,0 +1,24 @@
+format_version = 5
+id = "courier.enhancement.wait-skip"
+version = "1.0.0"
+name = "Frame Wait Skip"
+author = "local"
+description = "Lets the host skip the game's busy-wait for a free display buffer instead of executing it. Same game behavior, far less CPU, which keeps the game at full speed and the audio queue full."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00442"
+disc_sha256 = "307fd3c7fd3ef5ac61accb3457171947767dfc6a8690f5023ca8230ee5c60127"
+
+[[feature]]
+id = "wait-skip"
+name = "Frame Wait Skip"
+description = "Skip the busy-wait for a free display buffer."
+group = "Quality of Life"
+default_enabled = true
+hidden = true
+
+[[plugin]]
+feature = "wait-skip"
+id = "courier.wait-skip"

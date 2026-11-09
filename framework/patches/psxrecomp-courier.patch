@@ -1,0 +1,48 @@
+diff --git a/runtime/include/overlay_dispatch_preamble.c.inc b/runtime/include/overlay_dispatch_preamble.c.inc
+index 9b937a0c..a81003b4 100644
+--- a/runtime/include/overlay_dispatch_preamble.c.inc
++++ b/runtime/include/overlay_dispatch_preamble.c.inc
+@@ -109,6 +109,10 @@ int psx_game_text_native_ok(uint32_t addr) {
+  * emits these; forward to the runtime's real impls so native overlays charge cycles on
+  * the SAME timeline as the interp/BIOS (a local copy would diverge). NULL-guarded so a
+  * v9 DLL stays safe on a host that predates a given callback. */
++/* LOCAL TUNING (Courier Crisis): with PSX_NATIVE_CPU_SPANS, psx_native_span.h turns
++ * psx_cyc_load_*, psx_cyc_lwc2_read and psx_icache_fetch into macros, and no call
++ * reaches these shims. Defining them too would macro-expand the definitions. */
++#ifndef PSX_NATIVE_CPU_SPANS
+ uint32_t psx_cyc_load_word(CPUState *cpu, uint32_t addr, uint32_t rt, uint32_t reg_mask) {
+     overlay_flush_cycles();
+     return g_cbs.cyc_load_word ? g_cbs.cyc_load_word(cpu, addr, rt, reg_mask) : cpu->read_word(addr);
+@@ -129,6 +133,7 @@ void psx_icache_fetch(CPUState *cpu, uint32_t addr) {
+     overlay_flush_cycles();
+     if (g_cbs.icache_fetch) g_cbs.icache_fetch(cpu, addr);
+ }
++#endif /* !PSX_NATIVE_CPU_SPANS */
+ void psx_muldiv_set(CPUState *cpu, uint32_t latency) {
+     overlay_flush_cycles();
+     if (g_cbs.muldiv_set) g_cbs.muldiv_set(cpu, latency);
+diff --git a/tools/compile_overlays.py b/tools/compile_overlays.py
+index 82b2ed99..0cf5c986 100644
+--- a/tools/compile_overlays.py
++++ b/tools/compile_overlays.py
+@@ -6224,6 +6224,8 @@ def _compile_dll_tcc(c_path: str, out_dll: str, include_dirs, flavor: int,
+            # TCC shard.
+            '-DPSX_NO_DEBUG_TOOLS',
+            '-DPSX_ENABLE_BLOCK_CYCLES=1',
++           # LOCAL TUNING (Courier Crisis): native CPU spans also on the tcc fallback.
++           '-DPSX_NATIVE_CPU_SPANS=1',
+            f'-DPSX_OVERLAY_FLAVOR={int(flavor)}',
+            # PGXP flavor bit (overlay_api.h PSX_OVERLAY_FLAVOR_PGXP): arm the
+            # PGXP_*() hook macros the emitter writes into every overlay C.
+@@ -6272,6 +6274,11 @@ def _compile_dll_direct(c_path: str, out_dll: str, include_dirs: list[str],
+         # interp charges per-instruction -> timer-sensitive code (e.g. a Timer1
+         # debounce) reads different values per backend and the game forks.
+         '-DPSX_ENABLE_BLOCK_CYCLES=1',
++        # LOCAL TUNING (Courier Crisis): generated CPU spans. One approximate
++        # cycle charge per control-flow span instead of an i-cache fetch and a
++        # load-timing call per instruction (each one a DLL->exe callback). This
++        # matches how the ENHANCED runtime itself is built (PSX_NATIVE_CPU_SPANS=ON).
++        '-DPSX_NATIVE_CPU_SPANS=1',
+         # Codegen-flavor tag baked into overlay_abi() (base=0). The loader
+         # rejects DLLs whose flavor differs from the runtime's, so a widescreen
+         # cache and a base cache can never cross-contaminate even if they share

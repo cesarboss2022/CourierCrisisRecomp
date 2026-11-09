@@ -1,0 +1,32 @@
+format_version = 5
+id = "courier.enhancement.fps60"
+version = "1.0.0"
+name = "60 FPS"
+author = "local"
+description = "Unlocks the game's 30 fps cap inside levels so it runs at 60 fps. Game speed is unchanged: its logic is time based."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00442"
+disc_sha256 = "307fd3c7fd3ef5ac61accb3457171947767dfc6a8690f5023ca8230ee5c60127"
+
+[[feature]]
+id = "fps60"
+name = "60 FPS"
+description = "Run levels at up to 60 fps instead of the original 30 fps cap. Needs a fast CPU thread; heavy scenes can still drop below 60. Switching the feature on or off applies the next time the game starts; the option below applies immediately."
+group = "Frame Rate"
+default_enabled = true
+
+[[option]]
+feature = "fps60"
+id = "unlock"
+label = "Unlock 60 FPS"
+description = "On: levels run at up to 60 fps. Off: the original 30 fps cap. Applies immediately."
+group = "Frame Rate"
+type = "boolean"
+default = "true"
+
+[[plugin]]
+feature = "fps60"
+id = "courier.fps60"

@@ -1,0 +1,105 @@
+# Courier Crisis - The Saga of the Modern Fatalist (USA), SLUS-00442.
+# The disc is never stored here: build.ps1 -Disc <path> extracts what it needs.
+
+[game]
+name = "CourierCrisis"
+id = "SLUS-00442"
+players = 1
+exe = "disc/SLUS_004.42"
+load_address = "0x801C0000"
+entry_pc = "0x801C0BB8"
+text_size = "0x00024000"
+stack_base = "0x801FFFF0"
+
+# Digests are for data Track 01 (first BINARY FILE / TRACK 01).
+[prepare_disc]
+out_dir = "disc"
+bin_name = "Courier Crisis - The Saga of the Modern Fatalist (USA).bin"
+cue_name = "Courier Crisis - The Saga of the Modern Fatalist (USA).cue"
+boot_exe = "SLUS_004.42"
+known_sizes = [377717088]
+known_md5 = [
+  "b12ae82174ee512c1ca79326cbc7e01d",
+]
+known_sha1 = [
+  "128d0808e4ec8b8f84881bda2ea880ee4cfcd89b",
+]
+known_crc32 = [
+  "4996ad1d",
+]
+
+[recompiler]
+seeds = "seeds/ghidra_funcs.txt"
+out_dir = "generated"
+strict = true
+
+[runtime]
+window_title = "Courier Crisis Recompiled"
+memcard_dir = "saves"
+overlay_cache = true
+# Skip busy-wait loops with no stores up to the next device event. With the guest
+# cycle scale the game spends the slack of each frame spinning on the buffer
+# release, and that spinning costs real host time.
+idle_skip = true
+
+[video]
+renderer = "opengl"
+aspect_ratio = "16:9"
+# Enhancements (baseline; players can still change them in the Mods page)
+internal_resolution = "display"      # match monitor height
+match_display_max_lines = 2160       # cap at 4K so GPU memory stays sane
+supersampling = 2                    # required for PGXP sub-pixel to show
+geometry_correction = true           # PGXP: removes vertex wobble
+perspective_texturing = true         # perspective-correct UVs
+antialiasing_mode = "fxaa"
+# Smooth motion (frame_generation) tested: artifacts + extra input latency, so
+# it stays off. Crossfade interpolation (PSX_FRAME_INTERPOLATION) is kept as a
+# future optional setting.
+render_thread = true
+frame_generation = false
+
+# Widescreen, first pass: framework defaults only. The game code lives in
+# disc overlays, so the static scan of the boot EXE found nothing reliable
+# (its screen_w_imms were flagged as a guess and are NOT used here).
+# Refine with playtesting: cull pop-in at the edges -> screen_x_sites etc.
+[widescreen]
+# Without a gameplay signal the runtime presents everything at 4:3. A frame that
+# projects >=3 vertices through the GTE counts as gameplay (45-frame hysteresis).
+gte_game_mode   = true
+# In-level flag (found by diffing RAM across menu/title/play/pause): 1 from the
+# moment a level starts loading until it is left, including the pause menu; 0 on
+# the title and level-select screens. Makes the pause stay wide and keeps the
+# 3D-animated menus at 4:3.
+gameplay_state_addr   = "0x800A12D4"
+gameplay_state_values = ["0x1"]
+hud_sprt_squash = true
+auto_ui_squash  = true
+auto_ui_anchor  = "edges"
+
+[widescreen.cull]
+# auto_screen_x = true widened three screen-rect clamps at 0x80078B64/80/94
+# (slti ...,320/321) in the span-list builder. Their consumer at 0x80078FEC
+# still clamps to 320, so the list went inconsistent and the first level hung
+# on a black screen. They are not render culls: leave this OFF.
+auto_screen_x = false
+
+# Guest CPU overclock, only while a level is running. The scale charges each
+# instruction 1/N of its cost, so N times as much game code fits between two
+# VBlanks. Applied from boot it stops the BIOS from ever delivering a VBlank
+# (black screen), hence the gate: 0x800A12D4 is the in-level flag also used by
+# the widescreen gate (1 from the moment a level starts loading until it is left).
+[timing]
+guest_cycle_scale = 3
+guest_cycle_scale_gate = [
+  { addr = 0x800A12D4, value = 1 },
+]
+
+[controller]
+default_mode = "digital"
+
+# Online mount gate: digests + track count + optional TOC fingerprint
+# (see docs/NETPLAY.md).
+[netplay]
+require_cue = true
+required_tracks = 1
+required_disc_fp = "592e96968c9525e29305009e56ee18c7abb0de6ada5150930d5fa6ff0b407c1d"

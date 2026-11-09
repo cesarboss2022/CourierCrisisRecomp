@@ -1,0 +1,44 @@
+format_version = 5
+id = "courier.enhancement.widescreen"
+version = "1.0.0"
+name = "Widescreen"
+author = "local"
+description = "Experimental native-wide gameplay view for Courier Crisis."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00442"
+disc_sha256 = "307fd3c7fd3ef5ac61accb3457171947767dfc6a8690f5023ca8230ee5c60127"
+
+[[feature]]
+id = "widescreen"
+name = "Widescreen"
+description = "Widens the gameplay view. The render target and object culling expand with the aspect ratio; FMVs, menus and the BIOS stay 4:3."
+group = "Display"
+default_enabled = true
+
+[[option]]
+feature = "widescreen"
+id = "aspect"
+label = "View"
+description = "Fit to Window follows live resizing from 4:3 up to 21:9. Fixed ratios use the same renderer."
+group = "Display"
+type = "choice"
+default = "16:9"
+
+[[option.choice]]
+value = "16:9"
+label = "16:9"
+
+[[option.choice]]
+value = "21:9"
+label = "21:9"
+
+[[option.choice]]
+value = "Fit"
+label = "Fit to Window"
+
+[[plugin]]
+feature = "widescreen"
+id = "courier.widescreen"

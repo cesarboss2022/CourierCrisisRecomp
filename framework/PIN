@@ -1,0 +1,5 @@
+# Pinned framework revisions. Format: <directory> <commit> <clone URL>
+# scripts/setup_framework.ps1 clones each one into the repository root, checks
+# out the commit and applies framework/patches/<directory>-courier.patch.
+psxrecomp 64dff4826cd4a3be343524c428e4b8b2941b4e10 https://github.com/mstan/psxrecomp.git
+recomp-ui 29fa3d14e5a10635d84f36e160f04dd57fd775d2 https://github.com/RetroPortingToolKit/recomp-ui.git

@@ -1,0 +1,87 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+# No runner has the game: the framework is fetched and patched, every source of
+# the runtime is compiled without any game code linked, the plugins are checked
+# against the patched headers and the Python tools are linted. The game itself
+# (generated/ from the disc, including GAME.EXE compiled ahead of time) is built
+# on the maintainer's machine; see docs/BUILD.md.
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 300M
+
+jobs:
+  windows:
+    name: Windows, MinGW-w64
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-ccache
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-python
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ccache
+          key: ccache-mingw-${{ github.sha }}
+          restore-keys: ccache-mingw-
+      - name: Fetch the pinned framework and apply the patches
+        shell: pwsh
+        run: ./tools/setup_framework.ps1
+      - name: Check the plugins and the metadata
+        run: |
+          set -e
+          for f in src/mods/*.c; do
+            clang -fsyntax-only -Wall -I psxrecomp/runtime/include -I recomp-ui/src "$f"
+          done
+          python -c "import json,tomllib;[json.load(open(f)) for f in ('.recomp.json','catalog_identity.json','aot/overlays.json');tomllib.load(open('game.toml','rb'));tomllib.load(open('packaging/release.toml','rb'))"
+      - name: Compile the runtime without the game
+        run: |
+          ccache --zero-stats
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DPSXRECOMP_REQUIRE_GAME_C=OFF -DPSX_DEBUG_TOOLS=OFF
+          cmake --build build
+          ccache --show-stats
+
+  python:
+    name: Python tools, ruff
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the Python tools and tests with ruff
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ruff"
+          echo "ruff==0.17.2 --hash=sha256:c60f93fec7142dba5b8f487f94bf2f6231dae24dc11e4c48648347c8b0720004" > "$RUNNER_TEMP/ruff.txt"
+          "$RUNNER_TEMP/ruff/bin/pip" install --quiet --no-deps --require-hashes -r "$RUNNER_TEMP/ruff.txt"
+          "$RUNNER_TEMP/ruff/bin/ruff" check .
+          "$RUNNER_TEMP/ruff/bin/ruff" format --check .

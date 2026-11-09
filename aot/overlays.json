@@ -1,0 +1,34 @@
+{
+  "schema": "psxrecomp AOT methods v1",
+  "game_id": "SLUS-00442",
+  "static_output": "generated/overlays_static.c",
+  "disc_hashes": {
+    "sha1": "128d0808e4ec8b8f84881bda2ea880ee4cfcd89b",
+    "md5": "b12ae82174ee512c1ca79326cbc7e01d"
+  },
+  "generic_exclude_files": [
+    {
+      "files": ["GAME.EXE"],
+      "reason": "GAME.EXE is zero-padded to a sector multiple after its PS-X EXE text, which the generic detector rejects; the image below owns it"
+    }
+  ],
+  "images": [
+    {
+      "method": "fixed_address_extents",
+      "allow_missing": true,
+      "entries": ["0x80086334"],
+      "extents": [
+        {
+          "file": "GAME.EXE",
+          "file_offset": "0x800",
+          "base": "0x80010000",
+          "address": "0x80010000",
+          "load_addr": "0x80010000",
+          "size": "0x9D800",
+          "sha256": "accd16bd0aaee085dc429e8b487df025f6b229e8a37ef215bf05c94026a2378a"
+        }
+      ]
+    }
+  ],
+  "expected_records": 1
+}

@@ -1,0 +1,54 @@
+# Framework checkouts (fetched by scripts/setup_framework.ps1) and build outputs
+/psxrecomp/
+/recomp-ui/
+/build/
+/build-*/
+/dist/
+/toolchain/
+/.cache/
+
+# Generated from your own disc: never commit it
+/generated/
+/disc/
+/bios/
+/saves/
+/cache/
+
+# User-owned game data
+*.bin
+*.cue
+*.iso
+*.img
+*.sub
+*.ccd
+*.chd
+*.mcd
+*.mcr
+*.pst
+SLUS_004.42
+SLUS_004.42.code
+
+# Runtime and debug output
+overlay_captures.json
+overlay_captures.json.d/
+psx_crash.txt
+psx_last_run_report.json
+psx_freeze_heartbeat.json
+psx_freeze_dump*.json
+*.log
+settings.toml
+input.ini
+keybinds.ini
+launcher-window.ini
+*.zip
+*.dll
+
+# Local editor and Python files
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+release/notes/

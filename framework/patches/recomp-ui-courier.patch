@@ -1,0 +1,401 @@
+diff --git a/src/common/backends/imgui/runtime_ui_imgui.cpp b/src/common/backends/imgui/runtime_ui_imgui.cpp
+index dcd0ad4..1b2df20 100644
+--- a/src/common/backends/imgui/runtime_ui_imgui.cpp
++++ b/src/common/backends/imgui/runtime_ui_imgui.cpp
+@@ -9,6 +9,7 @@
+ #include <algorithm>
+ #include <cstdio>
+ #include <cstring>
++#include <string>
+ 
+ namespace {
+ 
+@@ -77,8 +78,35 @@ void draw_sections(RecompRuntimeUi *ui, const LauncherTheme &theme,
+     }
+ }
+ 
++// Last row/section the list was scrolled to. The selection moves with the
++// keyboard or a pad, and the child window must follow it; the mouse wheel and
++// hover must not be fought, so a hovered row never triggers a scroll.
++size_t g_scrolled_row = static_cast<size_t>(-1);
++size_t g_scrolled_section = static_cast<size_t>(-1);
++
++// Draws `text` on one line, cut with "..." where it would pass `max_w`.
++void draw_ellipsized(ImDrawList *draw, ImVec2 pos, float max_w, ImU32 color,
++                     const char *text) {
++    if (ImGui::CalcTextSize(text).x <= max_w) {
++        draw->AddText(pos, color, text);
++        return;
++    }
++    std::string cut(text);
++    while (!cut.empty() &&
++           ImGui::CalcTextSize((cut + "...").c_str()).x > max_w) {
++        cut.pop_back();
++        // Never end inside a multi-byte UTF-8 sequence.
++        while (!cut.empty() &&
++               (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80)
++            cut.pop_back();
++    }
++    cut += "...";
++    draw->AddText(pos, color, cut.c_str());
++}
++
+ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+                 bool touch_friendly) {
++    if (!ui->in_section) g_scrolled_row = static_cast<size_t>(-1);
+     const size_t count = recomp_runtime_ui_page_entry_count(ui);
+     for (size_t index = 0; index < count; ++index) {
+         char folder[96];
+@@ -118,9 +146,20 @@ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+         ImGui::PushID(static_cast<int>(index));
+         if (!enabled) ImGui::BeginDisabled();
+         const ImVec2 start = ImGui::GetCursorScreenPos();
+-        const float row_h = item->description && item->description[0]
+-                                ? theme.row_height + theme.spacing_sm
+-                                : theme.row_height;
++        const bool has_desc = item->description && item->description[0];
++        const float desc_wrap_w = std::max(
++            80.0f, ImGui::GetContentRegionAvail().x - theme.spacing_md * 2.0f);
++        // The selected row shows its whole description, wrapped; the others show
++        // one line, cut with an ellipsis, so a long text never runs off the panel.
++        const float desc_extra_h =
++            has_desc && selected
++                ? std::max(0.0f,
++                           ImGui::CalcTextSize(item->description, nullptr, false,
++                                               desc_wrap_w).y -
++                               ImGui::GetTextLineHeight())
++                : 0.0f;
++        const float row_h = (has_desc ? theme.row_height + theme.spacing_sm
++                                      : theme.row_height) + desc_extra_h;
+         const float step_button_w =
+             touch_friendly ? std::max(76.0f, row_h * 0.90f) : 38.0f;
+         const float step_gap = touch_friendly ? 12.0f : 6.0f;
+@@ -146,6 +185,14 @@ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+             ui->row_index = index;
+             ui->in_section = 1;
+         }
++        // Keep the keyboard/pad selection on screen. A hovered row is the mouse's
++        // choice, and the wheel already scrolls, so only scroll when it is not.
++        if (selected && ui->in_section &&
++            (g_scrolled_row != index || g_scrolled_section != ui->section_index)) {
++            if (!ImGui::IsItemHovered()) ImGui::SetScrollHereY(0.5f);
++            g_scrolled_row = index;
++            g_scrolled_section = ui->section_index;
++        }
+ 
+         ImDrawList *draw = ImGui::GetWindowDrawList();
+         const ImVec2 end = ImGui::GetItemRectMax();
+@@ -167,11 +214,17 @@ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+                                                   : theme.text_muted),
+                           value);
+         }
+-        if (item->description && item->description[0]) {
+-            draw->AddText(ImVec2(start.x + theme.spacing_md,
+-                                start.y + theme.spacing_sm +
+-                                    ImGui::GetTextLineHeight() + 2.0f),
+-                          u32(theme.text_muted), item->description);
++        if (has_desc) {
++            const ImVec2 desc_pos(start.x + theme.spacing_md,
++                                  start.y + theme.spacing_sm +
++                                      ImGui::GetTextLineHeight() + 2.0f);
++            if (selected)
++                draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), desc_pos,
++                              u32(theme.text_muted), item->description, nullptr,
++                              desc_wrap_w);
++            else
++                draw_ellipsized(draw, desc_pos, desc_wrap_w, u32(theme.text_muted),
++                                item->description);
+         }
+         if (editing_this && enabled) {
+             const float field_w = touch_friendly
+diff --git a/src/common/launcher_theme.h b/src/common/launcher_theme.h
+index 317e920..9f2fd7c 100644
+--- a/src/common/launcher_theme.h
++++ b/src/common/launcher_theme.h
+@@ -278,12 +278,37 @@ static inline LauncherTheme launcher_theme_gbc(void) {
+     return t;
+ }
+ 
+-// Pick a built-in theme by name ("psx" -> PlayStation, "gba" -> Game Boy
++// "Courier Crisis" theme. Night-city asphalt: a warm near-black ground, ONE
++// courier-bag yellow accent for brand + primary action (dark ink on top of it
++// for contrast), a hot orange secondary for section headings, no scanlines.
++static inline LauncherTheme launcher_theme_courier(void) {
++    LauncherTheme t = launcher_theme_default();   // inherit spacing/type/dims
++    t.background      = lng_rgba(0.059f, 0.055f, 0.051f, 1.0f); // #0F0E0D asphalt
++    t.background2     = lng_rgba(0.102f, 0.094f, 0.082f, 1.0f); // #1A1815 lifted center
++    t.panel           = lng_rgba(0.122f, 0.114f, 0.102f, 1.0f); // #1F1D1A card
++    t.panel_hovered   = lng_rgba(0.180f, 0.165f, 0.141f, 1.0f); // #2E2A24
++    t.control         = lng_rgba(0.153f, 0.141f, 0.125f, 1.0f); // #272420 button
++    t.control_hovered = lng_rgba(0.220f, 0.200f, 0.169f, 1.0f); // #38332B
++    t.border          = lng_rgba(0.267f, 0.243f, 0.200f, 1.0f); // #443E33 hairline
++    t.accent          = lng_rgba(1.000f, 0.761f, 0.102f, 1.0f); // #FFC21A courier yellow
++    t.accent_dim      = lng_rgba(0.804f, 0.576f, 0.047f, 1.0f); // #CD930C pressed/gradient
++    t.accent_text     = lng_rgba(0.075f, 0.067f, 0.051f, 1.0f); // dark ink on yellow
++    t.accent2         = lng_rgba(1.000f, 0.420f, 0.180f, 1.0f); // #FF6B2E hot orange (headings)
++    t.text            = lng_rgba(0.941f, 0.929f, 0.902f, 1.0f); // #F0EDE6 warm off-white
++    t.text_muted      = lng_rgba(0.620f, 0.588f, 0.525f, 1.0f); // #9E9686
++    t.scanlines       = 0;
++    return t;
++}
++
++// Pick a built-in theme by name ("courier" -> Courier Crisis, "psx" -> PlayStation, "gba" -> Game Boy
+ // Advance, "gbc" -> Game Boy Color, "gb" -> Game Boy (DMG), "n64" -> Nintendo
+ // 64, "nes" -> Nintendo Entertainment System, "genesis" -> Sega Genesis;
+ // anything else -> default CRT). Note the "gb*" order: match "gba" and "gbc"
+ // (3rd char) BEFORE the bare "gb" fallback.
+ static inline LauncherTheme launcher_theme_by_name(const char* name) {
++    if (name && (name[0] == 'c' || name[0] == 'C') &&
++        (name[1] == 'o' || name[1] == 'O'))
++        return launcher_theme_courier();
+     if (name && (name[0] == 'p' || name[0] == 'P') &&
+         (name[1] == 's' || name[1] == 'S'))
+         return launcher_theme_psx();
+diff --git a/src/consoles/psx/psx_menu_provider.cpp b/src/consoles/psx/psx_menu_provider.cpp
+index 82955fa..398cfe5 100644
+--- a/src/consoles/psx/psx_menu_provider.cpp
++++ b/src/consoles/psx/psx_menu_provider.cpp
+@@ -17,7 +17,17 @@
+ #include "common/recomp_runtime_ui_internal.h"
+ 
+ #include <cstdio>
++#include <cstdlib>
+ #include <cstring>
++#include <string>
++#include <vector>
++
++#if defined(__has_include)
++#if __has_include("host_osd.h")
++#include "host_osd.h"
++#define RUI_PSX_HAS_HOST_VOLUME 1
++#endif
++#endif
+ 
+ namespace rui_psx {
+ namespace {
+@@ -85,7 +95,169 @@ void apply_video() {
+     if (g_restart) status("Applies with a quick restart when you close the menu");
+ }
+ 
++// ---- Mod rows ---------------------------------------------------------------
++// Every visible mod feature becomes a switch row plus one row per option, grouped
++// by the manifest's `group`. Changes go through PsxMenuHost::mod_set, which saves
++// them to mods/state.toml and applies them live when the plugin can. A change the
++// plugin cannot apply live is only saved: unlike the renderer rows, this menu does
++// not relaunch the game for it, so no progress is lost by touching a mod.
++struct ModRow {
++    std::string key, section, label, desc, pkg, feat, opt;
++    int kind = 0;             // 0 feature switch, 1 boolean, 2 choice, 3 integer
++    int feature_index = 0, option_index = 0;
++    std::vector<std::string> values, labels;
++    std::vector<const char *> label_ptrs;
++    int minv = 0, maxv = 1, step = 1;
++    int current = 0;
++};
++std::vector<ModRow> g_mod_rows;
++std::vector<RecompRuntimeUiItem> g_all_items;
++const RecompLauncherCModProvider *g_mods = nullptr;
++
++bool is_mod_item(const RecompRuntimeUiItem *item) {
++    return item && item->key && !std::strncmp(item->key, "mod.", 4);
++}
++size_t mod_index(const RecompRuntimeUiItem *item) {
++    return (size_t)std::strtoul(item->key + 4, nullptr, 10);
++}
++
++int parse_mod_value(const ModRow &r, const char *v) {
++    if (r.kind <= 1) return (!std::strcmp(v, "true") || !std::strcmp(v, "1")) ? 1 : 0;
++    if (r.kind == 2) {
++        for (size_t i = 0; i < r.values.size(); ++i)
++            if (r.values[i] == v) return (int)i;
++        return 0;
++    }
++    return std::atoi(v);
++}
++
++void refresh_mod_rows() {
++    if (!g_mods) return;
++    for (ModRow &r : g_mod_rows) {
++        if (r.kind == 0) {
++            RecompLauncherCModFeature f{};
++            if (g_mods->feature_get && g_mods->feature_get(g_mods->ctx, r.feature_index, &f))
++                r.current = f.enabled ? 1 : 0;
++            continue;
++        }
++        RecompLauncherCModOption o{};
++        if (g_mods->feature_option_get &&
++            g_mods->feature_option_get(g_mods->ctx, r.pkg.c_str(), r.feat.c_str(), r.option_index, &o))
++            r.current = parse_mod_value(r, o.value);
++    }
++}
++
++// Builds g_mod_rows and g_all_items (the stock extra rows first, then the mods).
++// Both outlive the menu: the model keeps pointers into them.
++void build_mod_rows(const RecompLauncherCModProvider *mods, size_t base_count) {
++    g_mod_rows.clear();
++    g_all_items.assign(g_extra, g_extra + base_count);
++    g_mods = mods;
++    if (mods && mods->feature_count && mods->feature_get && mods->feature_option_get) {
++        const int fc = mods->feature_count(mods->ctx);
++        for (int i = 0; i < fc; ++i) {
++            RecompLauncherCModFeature f{};
++            if (!mods->feature_get(mods->ctx, i, &f)) continue;
++            if (f.hidden || f.channel == RECOMP_MOD_CHANNEL_DEVELOPER) continue;
++            if (!std::strcmp(f.group, "Advanced")) continue;
++            const std::string section = f.group[0] ? f.group : "Mods";
++            ModRow sw;
++            sw.kind = 0;
++            sw.section = section;
++            sw.label = f.name;
++            sw.desc = std::string("Turn on or off (applies the next time the game starts). ") + f.description;
++            sw.pkg = f.package_id;
++            sw.feat = f.id;
++            sw.feature_index = i;
++            g_mod_rows.push_back(std::move(sw));
++            for (int j = 0; j < f.option_count; ++j) {
++                RecompLauncherCModOption o{};
++                if (!mods->feature_option_get(mods->ctx, f.package_id, f.id, j, &o)) continue;
++                ModRow r;
++                if (o.type == RECOMP_MOD_OPTION_BOOLEAN) r.kind = 1;
++                else if (o.type == RECOMP_MOD_OPTION_CHOICE) r.kind = 2;
++                else if (o.type == RECOMP_MOD_OPTION_INTEGER) r.kind = 3;
++                else continue;   // text and binding rows stay on the launcher's Mods page
++                r.section = section;
++                r.label = std::string(f.name) + " - " + o.label;
++                r.desc = o.description;
++                r.pkg = f.package_id;
++                r.feat = f.id;
++                r.opt = o.id;
++                r.feature_index = i;
++                r.option_index = j;
++                if (r.kind == 2) {
++                    for (int k = 0; k < o.choice_count; ++k) {
++                        RecompLauncherCModChoice c{};
++                        if (mods->feature_choice_get &&
++                            mods->feature_choice_get(mods->ctx, f.package_id, f.id, o.id, k, &c)) {
++                            r.values.push_back(c.value);
++                            r.labels.push_back(c.label[0] ? c.label : c.value);
++                        }
++                    }
++                    if (r.values.empty()) continue;
++                    r.minv = 0;
++                    r.maxv = (int)r.values.size() - 1;
++                } else if (r.kind == 3) {
++                    r.minv = (int)o.min_value;
++                    r.maxv = (int)o.max_value;
++                    r.step = o.step > 0 ? (int)o.step : 1;
++                }
++                g_mod_rows.push_back(std::move(r));
++            }
++        }
++    }
++    // Second pass: the vector no longer changes, so pointers into it stay valid.
++    for (size_t i = 0; i < g_mod_rows.size(); ++i) {
++        ModRow &r = g_mod_rows[i];
++        r.key = "mod." + std::to_string(i);
++        r.label_ptrs.clear();
++        for (const std::string &s : r.labels) r.label_ptrs.push_back(s.c_str());
++        RecompRuntimeUiItem it{};
++        it.key = r.key.c_str();
++        it.section = r.section.c_str();
++        it.label = r.label.c_str();
++        it.description = r.desc.c_str();
++        it.type = r.kind == 2 ? RECOMP_RUNTIME_UI_CHOICE
++                : r.kind == 3 ? RECOMP_RUNTIME_UI_INT
++                              : RECOMP_RUNTIME_UI_BOOL;
++        it.minimum = r.minv;
++        it.maximum = r.maxv;
++        it.step = r.step;
++        it.choices = r.kind == 2 ? r.label_ptrs.data() : nullptr;
++        it.choice_count = r.kind == 2 ? r.label_ptrs.size() : 0;
++        it.choice_values = nullptr;
++        g_all_items.push_back(it);
++    }
++    refresh_mod_rows();
++}
++
++int set_mod_row(size_t idx, int v) {
++    if (idx >= g_mod_rows.size() || !g_host || !g_host->mod_set) return 0;
++    ModRow &r = g_mod_rows[idx];
++    std::string val;
++    if (r.kind <= 1) val = v ? "true" : "false";
++    else if (r.kind == 2) {
++        if (v < 0 || (size_t)v >= r.values.size()) return 0;
++        val = r.values[(size_t)v];
++    } else val = std::to_string(v);
++    const int live = g_host->mod_set(r.pkg.c_str(), r.feat.c_str(),
++                                     r.kind == 0 ? nullptr : r.opt.c_str(), val.c_str());
++    r.current = v;
++    status(live ? "Applied" : "Saved. Applies the next time the game starts.");
++    return 1;
++}
++
+ int cb_get(void *, const RecompRuntimeUiItem *item, int *out) {
++    if (is_mod_item(item)) {
++        const size_t idx = mod_index(item);
++        if (idx >= g_mod_rows.size()) return 0;
++        *out = g_mod_rows[idx].current;
++        return 1;
++    }
++#if defined(RUI_PSX_HAS_HOST_VOLUME)
++    if (is(item, RECOMP_RUNTIME_UI_KEY_VOLUME)) { *out = host_volume_get(); return 1; }
++#endif
+     if (is(item, RECOMP_RUNTIME_UI_KEY_FULLSCREEN)) *out = g_video.fullscreen;
+     else if (is(item, "graphics.renderer")) *out = g_video.renderer;
+     else if (is(item, "graphics.render_thread")) *out = g_video.render_thread;
+@@ -100,6 +272,10 @@ int cb_get(void *, const RecompRuntimeUiItem *item, int *out) {
+ }
+ 
+ int cb_set(void *, const RecompRuntimeUiItem *item, int v) {
++    if (is_mod_item(item)) return set_mod_row(mod_index(item), v);
++#if defined(RUI_PSX_HAS_HOST_VOLUME)
++    if (is(item, RECOMP_RUNTIME_UI_KEY_VOLUME)) { host_volume_set(v); return 1; }
++#endif
+     if (is(item, RECOMP_RUNTIME_UI_KEY_FULLSCREEN)) g_video.fullscreen = v;
+     else if (is(item, "graphics.renderer")) {
+         if (v < 0 || v >= g_renderers) return 0;
+@@ -168,6 +344,7 @@ void cb_visibility(void *, int open) {
+         recomp_runtime_ui_enter_section(g_ui, 0);
+         recomp_runtime_ui_leave_section(g_ui);
+         if (g_host->video_get) g_host->video_get(&g_video);
++        refresh_mod_rows();
+         g_restart = 0;
+         const int mounted = g_host->disc_mounted ? g_host->disc_mounted() : 0;
+         g_disc = mounted > 0 ? mounted : 1;
+@@ -222,7 +399,7 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
+     RecompRuntimeUiStandardConfig cfg{};
+     cfg.menu.title = "Game menu";
+     cfg.menu.subtitle = g_subtitle;
+-    cfg.menu.theme = "psx";
++    cfg.menu.theme = "courier";
+     cfg.menu.accept_label = "Enter / Cross";
+     cfg.menu.back_label = "Esc / Circle";
+     cfg.menu.callbacks.get_value = cb_get;
+@@ -233,8 +410,12 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
+     cfg.features = RECOMP_RUNTIME_UI_STANDARD_FULLSCREEN | RECOMP_RUNTIME_UI_STANDARD_PAUSE_IN_MENU |
+                    RECOMP_RUNTIME_UI_STANDARD_RESUME | RECOMP_RUNTIME_UI_STANDARD_RETURN_TO_LAUNCHER |
+                    RECOMP_RUNTIME_UI_STANDARD_QUIT;
+-    cfg.extra_items = g_extra;
+-    cfg.extra_item_count = discs > 1 ? INSERT + 1 : DISC;
++#if defined(RUI_PSX_HAS_HOST_VOLUME)
++    cfg.features |= RECOMP_RUNTIME_UI_STANDARD_VOLUME;
++#endif
++    build_mod_rows(gi.mods, discs > 1 ? INSERT + 1 : DISC);
++    cfg.extra_items = g_all_items.data();
++    cfg.extra_item_count = g_all_items.size();
+     g_ui = recomp_runtime_ui_create_standard(&cfg);
+     if (!g_ui) { g_host = nullptr; return 0; }
+     return 1;
+diff --git a/src/consoles/psx/psx_profile.h b/src/consoles/psx/psx_profile.h
+index 57f8332..45fc3a3 100644
+--- a/src/consoles/psx/psx_profile.h
++++ b/src/consoles/psx/psx_profile.h
+@@ -158,7 +158,7 @@ static inline int launcher_console_is_psx(const char* name) {
+ // additions, pad-mode locks, disc CRC, callbacks) are set by the host AFTER
+ // this.
+ static inline void launcher_profile_apply_psx(RecompLauncherCGameInfo* gi) {
+-    gi->theme    = "psx";              // PlayStation blue, no CRT scanlines
++    gi->theme    = "courier";          // Courier Crisis: asphalt + courier yellow (local override of "psx")
+     gi->platform = "PLAYSTATION";
+     gi->rom_noun = "Disc";
+     // Controller: PSX has analog/digital pad modes + swapping DualShock art.

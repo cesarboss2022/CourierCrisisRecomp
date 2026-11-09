@@ -1,0 +1,48 @@
+{
+  "format_version": 1,
+  "game": {
+    "name": "CourierCrisis",
+    "id": "SLUS-00442",
+    "boot_exe": "SLUS_004.42"
+  },
+  "marketing": {
+    "description": "",
+    "publisher": "",
+    "year": "",
+    "region": "USA",
+    "players": 1
+  },
+  "rom_identity": {
+    "cue_name": "Courier Crisis - The Saga of the Modern Fatalist (USA).cue",
+    "bin_name": "Courier Crisis - The Saga of the Modern Fatalist (USA).bin",
+    "track_counts": [
+      1
+    ],
+    "require_cue": true,
+    "data_track": {
+      "size": 377717088,
+      "md5": "b12ae82174ee512c1ca79326cbc7e01d",
+      "sha1": "128d0808e4ec8b8f84881bda2ea880ee4cfcd89b",
+      "crc32": "4996ad1d"
+    },
+    "disc_fp": "592e96968c9525e29305009e56ee18c7abb0de6ada5150930d5fa6ff0b407c1d"
+  },
+  "exe": {
+    "load_address": "0x801C0000",
+    "entry_pc": "0x801C0BB8",
+    "text_size": "0x00024000",
+    "stack_base": "0x801FFFF0"
+  },
+  "seeds": {
+    "count": 186,
+    "source": "boot_exe_jal"
+  },
+  "warnings": [
+    "cue has only 1 TRACK \u2014 Track-01-only dumps fail multi-track netplay/catalog gates; prefer a full Redump cue."
+  ],
+  "notes": [
+    "entry_pc/load_address/text_size/stack_base taken from PS-X EXE header.",
+    "seeds are first-pass boot-EXE JAL targets (+ entry); expect to grow as overlays / runtime paths are discovered.",
+    "required_disc_fp is psxrecomp-toc-v1 (matches runtime DiscIdentity)."
+  ]
+}

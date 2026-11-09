@@ -1,0 +1,128 @@
+COURIER CRISIS - RECOMPILADO PARA WINDOWS (v0.1.0)
+=====================================================
+
+Versao nativa para Windows x64 de "Courier Crisis - The Saga of the Modern
+Fatalist" (PlayStation, versao USA), com resolucao interna alta, widescreen,
+60 fps e suporte a controles modernos (XInput / SDL).
+
+ESTE PACOTE NAO CONTEM O JOGO. Voce precisa do seu proprio disco original.
+Nenhuma BIOS da Sony e necessaria: o pacote usa a OpenBIOS (licenca MIT).
+
+
+1) O QUE VOCE PRECISA
+---------------------
+- Windows 10 ou 11 de 64 bits.
+- Placa de video com OpenGL/Vulkan atual e drivers atualizados.
+- Uma copia (dump) do seu disco ORIGINAL de Courier Crisis (USA, serial
+  SLUS-00442). Nao distribuimos o jogo nem ajudamos a obte-lo.
+- Para 60 fps: um processador com bom desempenho por nucleo. Cenas pesadas
+  podem cair abaixo de 60 em CPUs mais modestas.
+
+
+2) COMO PREPARAR O SEU DISCO
+----------------------------
+Formatos aceitos pelo launcher: .cue (recomendado), .bin, .img, .iso, .chd.
+
+- Dump em BIN/CUE: mantenha o .cue e o(s) .bin na MESMA pasta e escolha o
+  arquivo .cue no launcher (nao o .bin). O .cue precisa apontar para o nome
+  correto do .bin.
+- A faixa de dados (Track 01) da imagem USA original tem 377.717.088 bytes.
+  Se o seu arquivo tem outro tamanho, e outra versao/dump e o launcher pode
+  recusar ou avisar que o disco nao e o esperado.
+- Dumps CHD (compactados) tambem funcionam.
+- Nao e necessario extrair, converter nem aplicar patches no disco.
+- Alternativa: copie o dump para uma pasta de caminho curto (por exemplo
+  C:\Jogos\CourierCrisis\), sem caracteres especiais.
+
+
+3) PRIMEIRA EXECUCAO
+--------------------
+1. Extraia TODO o conteudo do .zip para uma pasta propria (por exemplo
+   C:\Jogos\CourierCrisis_Recompiled\). Nao rode de dentro do .zip.
+   Escolha uma pasta onde voce tenha permissao de escrita (evite
+   "C:\Program Files"): saves, configuracoes e cache ficam ao lado do .exe.
+2. Execute CourierCrisis_Recompiled.exe.
+3. No launcher, escolha o seu disco (.cue / .chd / .iso) quando solicitado.
+   O disco nunca e copiado para a pasta do jogo.
+4. Ajuste video, audio e controles se quiser e clique em PLAY.
+5. Dentro do jogo, F10 abre o menu de opcoes (video, som, 60 FPS, etc.).
+
+Se o Windows SmartScreen avisar sobre um aplicativo desconhecido, o
+executavel nao e assinado digitalmente: use "Mais informacoes" > "Executar
+assim mesmo".
+
+
+4) DESEMPENHO
+-------------
+O codigo do jogo (GAME.EXE) ja vem compilado para codigo nativo dentro do
+executavel, entao roda nativo desde o primeiro quadro: nao ha aquecimento
+nem engasgo na primeira visita a cada fase.
+
+- Um trecho minusculo de codigo (12 instrucoes fora do GAME.EXE) e compilado
+  sob demanda na sua maquina; os resultados ficam em cache\ ao lado do .exe.
+  Pode apagar essa pasta se quiser.
+- Este executavel contem codigo do jogo recompilado a partir do disco
+  original. Para jogar voce ainda precisa da sua propria copia do jogo.
+
+
+5) CONFIGURACOES UTEIS
+----------------------
+- 60 FPS: ligado por padrao dentro das fases (F10 > Frame Rate > Unlock 60
+  FPS). Desligue para voltar ao limite original de 30 fps. A logica do jogo
+  e baseada em tempo, entao a velocidade do jogo nao muda.
+- Widescreen: proporcao 16:9 por padrao (launcher > Display).
+  21:9 ainda nao foi validado.
+- Resolucao interna: pacote "Internal Resolution" (F10 / launcher > Mods).
+  Valores altos exigem mais da GPU.
+- Se a musica falhar ou o fps oscilar muito, reduza a resolucao interna
+  ou desligue o 60 FPS.
+- Os mods que acompanham o pacote ficam em mods\bundled\ e podem ser
+  ativados/desativados pelo launcher.
+
+
+6) ARQUIVOS E ATUALIZACAO
+-------------------------
+- saves\ ........ memory cards e save states (faca backup desta pasta).
+- settings.toml, keybinds.ini, input.ini, mods\state.toml: suas
+  configuracoes (criados na primeira execucao).
+- Para atualizar: extraia o novo .zip POR CIMA da pasta anterior. Seus saves
+  e configuracoes sao preservados.
+- Para desinstalar: apague a pasta.
+
+
+7) PROBLEMAS COMUNS
+-------------------
+- "Disco nao reconhecido": use o .cue (nao o .bin) e confirme se o .cue
+  referencia o .bin com o nome correto.
+- Tela preta ao iniciar: atualize o driver de video e tente trocar o
+  renderizador no launcher.
+- Launcher demora a abrir (pode levar varias dezenas de segundos em alguns
+  PCs): problema conhecido, ainda em investigacao.
+- Antivirus bloqueando a pasta cache\ ou overlay_toolchain\: adicione a
+  pasta do jogo as excecoes. As DLLs de cache sao geradas localmente.
+
+
+8) CREDITOS E LICENCAS
+----------------------
+Courier Crisis e marca/propriedade dos seus detentores originais. Este
+projeto e um port nao oficial feito por fas e nao e afiliado a eles.
+Recompilador e runtime: PSXRecomp (RetroPortingToolKit). OpenBIOS: MIT.
+Avisos de terceiros: pasta licenses\.
+
+
+===========================================================================
+ENGLISH SUMMARY
+===========================================================================
+Native Windows x64 build of Courier Crisis (USA, SLUS-00442) with high
+internal resolution, widescreen, 60 fps and modern controller support.
+NO game data is included. You must supply your own legally owned disc dump
+(.cue + .bin, .iso, .img or .chd; pick the .cue, not the .bin). The data
+track of the USA disc is 377,717,088 bytes. No retail BIOS needed (OpenBIOS
+bundled).
+
+Extract the whole zip to a writable folder, run CourierCrisis_Recompiled.exe,
+choose your disc on first launch, press F10 in game for the options menu.
+The game code (GAME.EXE) is already compiled to native code inside the exe, so
+there is no warm-up on first visits. The exe contains code recompiled from the
+original disc; you still need your own copy of the game to play. The exe is
+unsigned (SmartScreen may warn). To update, extract over the old folder.
