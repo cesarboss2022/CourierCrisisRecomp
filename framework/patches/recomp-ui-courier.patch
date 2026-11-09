@@ -1,9 +1,9 @@
 diff --git a/src/common/backends/imgui/launcher_courier.h b/src/common/backends/imgui/launcher_courier.h
 new file mode 100644
-index 0000000..478bcdf
+index 0000000..c027d89
 --- /dev/null
 +++ b/src/common/backends/imgui/launcher_courier.h
-@@ -0,0 +1,580 @@
+@@ -0,0 +1,688 @@
 +// launcher_courier.h -- the Courier Crisis "Enhancements" and "Help" pages.
 +//
 +// Included by launcher_imgui.cpp (inside its anonymous namespace) right before
@@ -337,24 +337,132 @@ index 0000000..478bcdf
 +
 +static bool cc_show_advanced = false;
 +
-+static void cc_draw_row(LauncherModel* m, const LauncherTheme& th, const RecompLauncherCModFeature& f,
-+                        const CcRow* row) {
++struct CcListed { RecompLauncherCModFeature f; const CcRow* row; int section; int order; };
++
++// The options a card shows under its switch (only while the feature is on).
++static void cc_card_options(LauncherModel* m, const CcListed& it,
++                            std::vector<RecompLauncherCModOption>* out) {
++    const RecompLauncherCModFeature& f = it.f;
++    if (!f.enabled || f.option_count <= 0 || !it.row || !(it.row->expand || it.row->primary)) return;
++    for (int j = 0; j < f.option_count; ++j) {
++        RecompLauncherCModOption o{};
++        if (!m->mods->feature_option_get(m->mods->ctx, f.package_id, f.id, j, &o)) continue;
++        if (!it.row->expand && std::strcmp(o.id, it.row->primary)) continue;
++        if (o.type == RECOMP_MOD_OPTION_BINDING || o.type == RECOMP_MOD_OPTION_TEXT) continue;
++        cc_localize_option(f, &o);
++        out->push_back(o);
++    }
++}
++
++static const float kCcPadX = 16.0f, kCcPadY = 13.0f, kCcToggleGap = 14.0f;
++
++static float cc_card_height(LauncherModel* m, const CcListed& it, float card_w) {
++    const bool pt = std::strcmp(launcher_i18n_language(), "pt") == 0;
++    const char* desc = it.row ? (pt ? it.row->desc_pt : it.row->desc_en) : it.f.description;
++    const float toggle_w = ImGui::GetFrameHeight() * 0.82f * 1.85f;
++    const float wrap = card_w - 2 * px(kCcPadX) - toggle_w - px(kCcToggleGap);
++    float h = 2 * px(kCcPadY) + ImGui::GetFrameHeight() * 0.9f;
++    if (desc && desc[0]) h += px(4) + ImGui::CalcTextSize(desc, nullptr, false, wrap).y * 0.92f;
++    std::vector<RecompLauncherCModOption> opts;
++    cc_card_options(m, it, &opts);
++    if (!opts.empty()) h += px(8) + (float)opts.size() * (ImGui::GetFrameHeight() + px(5));
++    return h + px(2);
++}
++
++// One option inside a card: a label on the left, its control on the right.
++static void cc_card_option(LauncherModel* m, const RecompLauncherCModFeature& f,
++                           const RecompLauncherCModOption& o, float inner_w) {
++    const auto* mods = m->mods;
++    const float ctl_w = px(180);
++    ImGui::PushID(o.id);
++    const bool inert = o.disabled != 0;
++    if (inert) ImGui::BeginDisabled();
++    char next[RECOMP_LAUNCHER_MOD_VALUE_MAX];
++    std::snprintf(next, sizeof(next), "%s", o.value);
++    bool changed = false;
++    if (o.type == RECOMP_MOD_OPTION_CHOICE) {
++        ImGui::AlignTextToFramePadding();
++        ImGui::TextUnformatted(o.label);
++        ImGui::SameLine(inner_w - ctl_w);
++        ImGui::SetNextItemWidth(ctl_w);
++        char preview[128];
++        std::snprintf(preview, sizeof(preview), "%s", o.value);
++        for (int c = 0; c < o.choice_count; ++c) {
++            RecompLauncherCModChoice ch{};
++            if (mods->feature_choice_get &&
++                mods->feature_choice_get(mods->ctx, f.package_id, f.id, o.id, c, &ch) &&
++                !std::strcmp(ch.value, o.value)) {
++                std::snprintf(preview, sizeof(preview), "%s", ch.label[0] ? ch.label : ch.value);
++                break;
++            }
++        }
++        if (ImGui::BeginCombo("##c", preview)) {
++            for (int c = 0; c < o.choice_count; ++c) {
++                RecompLauncherCModChoice ch{};
++                if (!mods->feature_choice_get ||
++                    !mods->feature_choice_get(mods->ctx, f.package_id, f.id, o.id, c, &ch)) continue;
++                const bool sel = !std::strcmp(ch.value, o.value);
++                if (ImGui::Selectable(ch.label, sel)) {
++                    std::snprintf(next, sizeof(next), "%s", ch.value);
++                    changed = true;
++                }
++                if (sel) ImGui::SetItemDefaultFocus();
++            }
++            ImGui::EndCombo();
++        }
++    } else if (o.type == RECOMP_MOD_OPTION_BOOLEAN) {
++        bool v = !std::strcmp(o.value, "true");
++        ImGui::AlignTextToFramePadding();
++        ImGui::TextUnformatted(o.label);
++        ImGui::SameLine(inner_w - ImGui::GetFrameHeight() * 0.82f * 1.85f);
++        if (ImGui::Checkbox("##b", &v)) {
++            std::snprintf(next, sizeof(next), "%s", v ? "true" : "false");
++            changed = true;
++        }
++    } else {
++        draw_mod_feature_option(m, f, o);   // integers and anything else: the stock control
++    }
++    const bool hovered = ImGui::IsItemHovered();
++    if (inert) ImGui::EndDisabled();
++    if (hovered) mod_option_tooltip(o);
++    if (changed && !inert &&
++        !mods->feature_set_option(mods->ctx, f.package_id, f.id, o.id, next))
++        mod_note_error(m);
++    ImGui::PopID();
++}
++
++static void cc_draw_card(LauncherModel* m, const LauncherTheme& th, const CcListed& it,
++                         float w, float h) {
++    const RecompLauncherCModFeature& f = it.f;
++    const CcRow* row = it.row;
 +    const bool pt = std::strcmp(launcher_i18n_language(), "pt") == 0;
 +    const char* name = row ? (pt ? row->name_pt : row->name_en) : f.name;
 +    const char* desc = row ? (pt ? row->desc_pt : row->desc_en) : f.description;
-+    ImGui::PushID(f.package_id);
-+    ImGui::PushID(f.id);
++    char id[160];
++    std::snprintf(id, sizeof(id), "##card_%s_%s", f.package_id, f.id);
 +
-+    const float full = ImGui::GetContentRegionAvail().x;
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(kCcPadX), px(kCcPadY)));
++    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, px(10));
++    ImGui::PushStyleColor(ImGuiCol_ChildBg, col(f.enabled ? th.panel_hovered : th.panel));
++    ImGui::PushStyleColor(ImGuiCol_Border, imcol(f.enabled ? th.accent : th.border, f.enabled ? 0.55f : 0.9f));
++    ImGui::BeginChild(id, ImVec2(w, h), ImGuiChildFlags_Borders,
++                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
++    const float inner = ImGui::GetContentRegionAvail().x;
 +    const float toggle_w = ImGui::GetFrameHeight() * 0.82f * 1.85f;
-+    const float row_top = ImGui::GetCursorPosY();
++    const float top = ImGui::GetCursorPosY();
++
++    ImGui::PushStyleColor(ImGuiCol_Text, col(th.text));
++    ImGui::SetWindowFontScale(1.06f);
 +    ImGui::TextUnformatted(name);
++    ImGui::SetWindowFontScale(1.0f);
++    ImGui::PopStyleColor();
 +    if (f.has_error) {
 +        ImGui::SameLine();
 +        ImGui::TextColored(col(th.warn), "!");
 +        if (ImGui::IsItemHovered() && f.status[0]) ImGui::SetTooltip("%s", f.status);
 +    }
-+    ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + full - toggle_w, row_top));
++    ImGui::SetCursorPos(ImVec2(px(kCcPadX) + inner - toggle_w, top));
++    ImGui::PushID(id);
 +    bool on = f.enabled != 0;
 +    if (cc_toggle("##on", &on, th)) {
 +        change_mod_feature(m, f, on);
@@ -363,87 +471,96 @@ index 0000000..478bcdf
 +            if (row->linked_feat2) cc_enable(m, row->linked_pkg2, row->linked_feat2, on);
 +        }
 +    }
-+    ImGui::SetCursorPosY(row_top + ImGui::GetFrameHeight() * 0.82f + px(3));
++    ImGui::PopID();
++    ImGui::SetCursorPos(ImVec2(px(kCcPadX), top + ImGui::GetFrameHeight() * 0.9f + px(4)));
 +    if (desc && desc[0]) {
 +        ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
-+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + full - toggle_w - px(24));
-+        ImGui::SetWindowFontScale(0.9f);
++        ImGui::PushTextWrapPos(px(kCcPadX) + inner - toggle_w - px(kCcToggleGap));
++        ImGui::SetWindowFontScale(0.92f);
 +        ImGui::TextWrapped("%s", desc);
 +        ImGui::SetWindowFontScale(1.0f);
 +        ImGui::PopTextWrapPos();
 +        ImGui::PopStyleColor();
 +    }
-+
-+    if (f.enabled && f.option_count > 0 && row && (row->expand || row->primary)) {
-+        ImGui::Indent(px(14));
-+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px(6), px(1.5f)));
-+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(px(8), px(2)));
-+        ImGui::SetWindowFontScale(0.86f);
-+        for (int j = 0; j < f.option_count; ++j) {
-+            RecompLauncherCModOption o{};
-+            if (!m->mods->feature_option_get(m->mods->ctx, f.package_id, f.id, j, &o)) continue;
-+            if (!row->expand && std::strcmp(o.id, row->primary)) continue;
-+            if (o.type == RECOMP_MOD_OPTION_BINDING || o.type == RECOMP_MOD_OPTION_TEXT) continue;
-+            cc_localize_option(f, &o);
-+            draw_mod_feature_option(m, f, o);
-+        }
++    std::vector<RecompLauncherCModOption> opts;
++    cc_card_options(m, it, &opts);
++    if (!opts.empty()) {
++        ImGui::Dummy(ImVec2(0, px(4)));
++        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px(8), px(2)));
++        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(px(8), px(5)));
++        ImGui::SetWindowFontScale(0.92f);
++        for (const auto& o : opts) cc_card_option(m, f, o, inner);
 +        ImGui::SetWindowFontScale(1.0f);
 +        ImGui::PopStyleVar(2);
-+        ImGui::Unindent(px(14));
 +    }
-+    ImGui::PopID();
-+    ImGui::PopID();
++    ImGui::EndChild();
++    ImGui::PopStyleColor(2);
++    ImGui::PopStyleVar(2);
 +}
 +
-+static void cc_divider(const LauncherTheme& th) {
-+    ImGui::Dummy(ImVec2(0, px(3)));
++static void cc_section_heading(const char* title, const LauncherTheme& th) {
++    ImGui::Dummy(ImVec2(0, px(6)));
 +    const ImVec2 p = ImGui::GetCursorScreenPos();
 +    const float w = ImGui::GetContentRegionAvail().x;
-+    ImGui::GetWindowDrawList()->AddLine(p, ImVec2(p.x + w, p.y), imcol(th.border, 0.7f));
-+    ImGui::Dummy(ImVec2(0, px(5)));
++    ImDrawList* dl = ImGui::GetWindowDrawList();
++    ImGui::SetWindowFontScale(0.95f);
++    const ImVec2 ts = ImGui::CalcTextSize(title);
++    dl->AddText(p, imcol(th.accent2, 1.0f), title);
++    dl->AddLine(ImVec2(p.x + ts.x + px(12), p.y + ts.y * 0.55f), ImVec2(p.x + w, p.y + ts.y * 0.55f),
++                imcol(th.border, 0.9f));
++    ImGui::SetWindowFontScale(1.0f);
++    ImGui::Dummy(ImVec2(0, ts.y + px(8)));
 +}
 +
-+struct CcListed { RecompLauncherCModFeature f; const CcRow* row; int section; int order; };
++static void cc_profile_card(LauncherModel* m, const LauncherTheme& th, int i, bool active, float w) {
++    const bool pt = std::strcmp(launcher_i18n_language(), "pt") == 0;
++    const float h = px(66);
++    ImGui::PushID(i);
++    const ImVec2 p = ImGui::GetCursorScreenPos();
++    if (ImGui::InvisibleButton("##profile", ImVec2(w, h))) cc_apply_profile(m, kCcProfiles[i]);
++    const bool hovered = ImGui::IsItemHovered();
++    ImDrawList* dl = ImGui::GetWindowDrawList();
++    const ImVec2 q(p.x + w, p.y + h);
++    dl->AddRectFilled(p, q, imcol(active ? th.accent_dim : (hovered ? th.panel_hovered : th.panel), active ? 0.38f : 1.0f), px(10));
++    dl->AddRect(p, q, imcol(active ? th.accent : th.border, active ? 1.0f : 0.9f), px(10), 0, active ? 2.0f : 1.0f);
++    ImFont* font = ImGui::GetFont();
++    dl->AddText(font, ImGui::GetFontSize() * 1.15f, ImVec2(p.x + px(16), p.y + px(10)),
++                imcol(th.text, 1.0f), pt ? kCcProfiles[i].name_pt : kCcProfiles[i].name_en);
++    dl->AddText(font, ImGui::GetFontSize() * 0.9f, ImVec2(p.x + px(16), p.y + px(37)),
++                imcol(th.text_muted, 1.0f), pt ? kCcProfiles[i].note_pt : kCcProfiles[i].note_en);
++    if (active) {
++        const ImVec2 c(q.x - px(22), p.y + px(22));
++        dl->AddCircleFilled(c, px(9), imcol(th.accent, 1.0f));
++        dl->AddLine(ImVec2(c.x - px(4), c.y), ImVec2(c.x - px(1), c.y + px(3.5f)), IM_COL32(20, 16, 8, 255), 2.0f);
++        dl->AddLine(ImVec2(c.x - px(1), c.y + px(3.5f)), ImVec2(c.x + px(4.5f), c.y - px(3.5f)), IM_COL32(20, 16, 8, 255), 2.0f);
++    }
++    ImGui::PopID();
++}
 +
 +static void draw_enhancements(LauncherModel* m, const LauncherTheme& th) {
 +    const auto* mods = m ? m->mods : nullptr;
 +    if (!m || !mods || !mods->feature_count || !mods->feature_get || !mods->feature_option_get ||
 +        !mods->feature_enable || !mods->feature_set_option) return;
-+    const bool pt = std::strcmp(launcher_i18n_language(), "pt") == 0;
 +
 +    // Profiles -------------------------------------------------------------
-+    eyebrow("PROFILE");
-+    ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
-+    ImGui::TextUnformatted(launcher_i18n_pair(
-+        "Changes are saved at once and apply the next time the game starts.",
-+        "As mudanças são salvas na hora e valem na próxima vez que o jogo for iniciado."));
-+    ImGui::PopStyleColor();
-+    ImGui::Dummy(ImVec2(0, px(6)));
 +    const int current = cc_current_profile(m);
 +    {
-+        const float gap = px(10);
++        const float gap = px(12);
 +        const float cw = (ImGui::GetContentRegionAvail().x - gap * 2) / 3.0f;
 +        for (int i = 0; i < 3; ++i) {
 +            if (i) ImGui::SameLine(0, gap);
-+            const bool active = (i == current);
-+            ImGui::PushID(i);
-+            if (active) {
-+                ImGui::PushStyleColor(ImGuiCol_Button, col(th.accent_dim));
-+                ImGui::PushStyleColor(ImGuiCol_Border, col(th.accent));
-+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
-+            }
-+            char label[256];
-+            std::snprintf(label, sizeof(label), "%s\n%s",
-+                          pt ? kCcProfiles[i].name_pt : kCcProfiles[i].name_en,
-+                          pt ? kCcProfiles[i].note_pt : kCcProfiles[i].note_en);
-+            if (ImGui::Button(label, ImVec2(cw, px(58)))) cc_apply_profile(m, kCcProfiles[i]);
-+            if (active) { ImGui::PopStyleVar(); ImGui::PopStyleColor(2); }
-+            ImGui::PopID();
++            cc_profile_card(m, th, i, i == current, cw);
 +        }
 +    }
-+    ImGui::PushStyleColor(ImGuiCol_Text, col(current >= 0 ? th.good : th.text_muted));
 +    ImGui::Dummy(ImVec2(0, px(2)));
++    ImGui::PushStyleColor(ImGuiCol_Text, col(current >= 0 ? th.good : th.text_muted));
 +    ImGui::Text("%s: %s", launcher_i18n_pair("Current profile", "Perfil atual"), cc_profile_name(current));
++    ImGui::PopStyleColor();
++    ImGui::SameLine();
++    ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
++    ImGui::TextUnformatted(launcher_i18n_pair(
++        "  -  changes are saved at once and apply the next time the game starts",
++        "  -  as mudanças são salvas na hora e valem na próxima vez que o jogo iniciar"));
 +    ImGui::PopStyleColor();
 +    if (m->mod_status[0]) {
 +        ImGui::PushStyleColor(ImGuiCol_Text, col(th.warn));
@@ -452,7 +569,6 @@ index 0000000..478bcdf
 +        ImGui::PopTextWrapPos();
 +        ImGui::PopStyleColor();
 +    }
-+    ImGui::Dummy(ImVec2(0, px(10)));
 +
 +    // Gather every listed feature, in table order -----------------------------
 +    std::vector<CcListed> items;
@@ -471,35 +587,35 @@ index 0000000..478bcdf
 +
 +    static const char* kTitleEn[CC_SECTION_COUNT] = {"PICTURE", "MOTION", "AUDIO", "FILTERS AND EFFECTS", "EXTRAS", "ADVANCED", "OTHER"};
 +    static const char* kTitlePt[CC_SECTION_COUNT] = {"IMAGEM", "MOVIMENTO", "ÁUDIO", "FILTROS E EFEITOS", "EXTRAS", "AVANÇADO", "OUTROS"};
++    const bool pt = std::strcmp(launcher_i18n_language(), "pt") == 0;
++    const float gap = px(12);
 +
 +    for (int s = 0; s < CC_SECTION_COUNT; ++s) {
-+        int count = 0;
-+        for (const CcListed& it : items) if (it.section == s) ++count;
-+        if (!count) continue;
++        std::vector<const CcListed*> cards;
++        for (const CcListed& it : items) if (it.section == s) cards.push_back(&it);
++        if (cards.empty()) continue;
 +        if (s == CC_ADVANCED) {
++            ImGui::Dummy(ImVec2(0, px(8)));
 +            if (ImGui::Button(cc_show_advanced
 +                    ? launcher_i18n_pair("Hide advanced options", "Ocultar opções avançadas")
 +                    : launcher_i18n_pair("Show advanced options", "Mostrar opções avançadas")))
 +                cc_show_advanced = !cc_show_advanced;
-+            ImGui::Dummy(ImVec2(0, px(6)));
 +            if (!cc_show_advanced) continue;
 +        }
-+        char pid[32];
-+        std::snprintf(pid, sizeof(pid), "cc_sec_%d", s);
-+        if (begin_panel(pid)) {
-+            ImGui::TextColored(col(th.accent2), "%s", pt ? kTitlePt[s] : kTitleEn[s]);
-+            ImGui::Dummy(ImVec2(0, px(4)));
-+            bool first = true;
-+            for (const CcListed& it : items) {
-+                if (it.section != s) continue;
-+                if (!first) cc_divider(th);
-+                first = false;
-+                cc_draw_row(m, th, it.f, it.row);
++        cc_section_heading(pt ? kTitlePt[s] : kTitleEn[s], th);
++        const float cw = (ImGui::GetContentRegionAvail().x - gap) * 0.5f;
++        for (size_t k = 0; k < cards.size(); k += 2) {
++            float h = cc_card_height(m, *cards[k], cw);
++            if (k + 1 < cards.size()) h = std::max(h, cc_card_height(m, *cards[k + 1], cw));
++            cc_draw_card(m, th, *cards[k], cw, h);
++            if (k + 1 < cards.size()) {
++                ImGui::SameLine(0, gap);
++                cc_draw_card(m, th, *cards[k + 1], cw, h);
 +            }
++            ImGui::Dummy(ImVec2(0, px(2)));
 +        }
-+        end_panel();
-+        ImGui::Dummy(ImVec2(0, px(8)));
 +    }
++    ImGui::Dummy(ImVec2(0, px(8)));
 +}
 +
 +// ---- Help and About ------------------------------------------------------------
@@ -574,14 +690,6 @@ index 0000000..478bcdf
 +    end_panel();
 +    ImGui::Dummy(ImVec2(0, px(8)));
 +
-+    if (begin_panel("cc_help_lang")) {
-+        ImGui::TextColored(col(th.accent2), "%s", launcher_i18n_pair("LANGUAGE", "IDIOMA"));
-+        ImGui::Dummy(ImVec2(0, px(4)));
-+        if (ImGui::RadioButton("Português (Brasil)", pt)) launcher_i18n_set_language("pt");
-+        ImGui::SameLine();
-+        if (ImGui::RadioButton("English", !pt)) launcher_i18n_set_language("en");
-+    }
-+    end_panel();
 +    (void)m;
 +}
 diff --git a/src/common/backends/imgui/launcher_courier_text.h b/src/common/backends/imgui/launcher_courier_text.h
@@ -633,7 +741,7 @@ index 0000000..a84ffe1
 +    return head + "\n" + pt("Technical detail: ", "Detalhe técnico: ") + err;
 +}
 diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
-index 43efa98..b8fd015 100644
+index 43efa98..03749d9 100644
 --- a/src/common/backends/imgui/launcher_imgui.cpp
 +++ b/src/common/backends/imgui/launcher_imgui.cpp
 @@ -102,6 +102,8 @@ static const char* ui_text(const char* en) {
@@ -684,7 +792,7 @@ index 43efa98..b8fd015 100644
 -        ImGui::SetWindowFontScale(1.0f);
 +        {   // A long title shrinks to leave room for the buttons on the right.
 +            const char* title = m->game_name ? m->game_name : "(null)";
-+            const float reserve = px(m->view == LNG_VIEW_DASHBOARD ? 590.0f : 150.0f);
++            const float reserve = px(m->view == LNG_VIEW_DASHBOARD ? 480.0f : 150.0f);
 +            const float avail = ImGui::GetWindowContentRegionMax().x - ImGui::GetCursorPosX() - reserve;
 +            const float natural = ImGui::CalcTextSize(title).x;
 +            float scale = natural > 1.0f ? avail / natural : 1.55f;
@@ -697,7 +805,7 @@ index 43efa98..b8fd015 100644
          // Platform lockup: the wordmark image when a host supplied one
          // (SystemProfile.wordmark_image), else the plain platform text.
          if (g_wordmark.id && g_wordmark.w > 0) {
-@@ -14573,35 +14587,71 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+@@ -14573,35 +14587,56 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
          }
      ImGui::EndGroup();
      {   // right-aligned top-level navigation
@@ -714,19 +822,17 @@ index 43efa98..b8fd015 100644
 -            const float w = px(110.0f);
 -            const float total = w * count + gap * (count - 1);
 +            struct HdrBtn { const char* label; int kind; };
-+            HdrBtn btns[7]; int count = 0;
-+            btns[count++] = {"##lang", 0};
++            HdrBtn btns[6]; int count = 0;
 +            if (m->mods) btns[count++] = {ui_text(launcher_i18n_pair("Enhancements", "Aprimoramentos")), 1};
 +            btns[count++] = {ui_text("Settings"), 2};
 +            if (m->mods) btns[count++] = {ui_text("Mods"), 3};
 +            btns[count++] = {launcher_i18n_pair("Help", "Ajuda"), 4};
 +            if (m->has_assist_tools) btns[count++] = {ui_text("Assist Tools"), 5};
 +            if (m->credits_text && m->credits_text[0]) btns[count++] = {ui_text("Credits"), 6};
-+            float widths[7]; float total = gap * (count - 1);
++            float widths[6]; float total = gap * (count - 1);
 +            for (int i = 0; i < count; ++i) {
 +                widths[i] = ImGui::CalcTextSize(btns[i].label).x + px(24.0f);
 +                if (widths[i] < px(64.0f)) widths[i] = px(64.0f);
-+                if (btns[i].kind == 0) widths[i] = px(116.0f);
 +                total += widths[i];
 +            }
              ImGui::SetCursorPos(ImVec2(right - total, y));
@@ -751,19 +857,6 @@ index 43efa98..b8fd015 100644
 +                if (i) ImGui::SameLine(0, gap);
 +                const ImVec2 size(widths[i], px(34));
 +                switch (btns[i].kind) {
-+                case 0: {
-+                    const bool ptl = std::strcmp(launcher_i18n_language(), "pt") == 0;
-+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
-+                        ImVec2(px(10.0f), (px(34.0f) - ImGui::GetFontSize()) * 0.5f));
-+                    ImGui::SetNextItemWidth(widths[i]);
-+                    if (ImGui::BeginCombo("##lang", ptl ? "Português" : "English")) {
-+                        if (ImGui::Selectable("Português", ptl)) launcher_i18n_set_language("pt");
-+                        if (ImGui::Selectable("English", !ptl)) launcher_i18n_set_language("en");
-+                        ImGui::EndCombo();
-+                    }
-+                    ImGui::PopStyleVar();
-+                    break;
-+                }
 +                case 1:
 +                    ImGui::PushStyleColor(ImGuiCol_Border, col(th.accent));
 +                    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
@@ -792,7 +885,7 @@ index 43efa98..b8fd015 100644
              }
          } else {
              const float w = px(110.0f);
-@@ -14677,6 +14727,8 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+@@ -14677,6 +14712,8 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
          case LNG_VIEW_NETPLAY_MODE:   draw_netplay_mode_page(m, th);   break;
          case LNG_VIEW_NETPLAY_SIGNIN: draw_netplay_signin_page(m, th); break;
          case LNG_VIEW_MODS:       draw_mods(m, th);                 break;
@@ -912,7 +1005,7 @@ index dcd0ad4..1b2df20 100644
          if (editing_this && enabled) {
              const float field_w = touch_friendly
 diff --git a/src/common/launcher_i18n.cpp b/src/common/launcher_i18n.cpp
-index 91a6c97..3587c60 100644
+index 91a6c97..be955ca 100644
 --- a/src/common/launcher_i18n.cpp
 +++ b/src/common/launcher_i18n.cpp
 @@ -1,6 +1,11 @@
@@ -1074,7 +1167,7 @@ index 91a6c97..3587c60 100644
  static const char* lookup(const LauncherI18nEntry* entries, int count,
                            const char* english) {
      if (!english) return "";
-@@ -215,21 +360,59 @@ static const char* lookup(const LauncherI18nEntry* entries, int count,
+@@ -215,21 +360,38 @@ static const char* lookup(const LauncherI18nEntry* entries, int count,
      return english;
  }
  
@@ -1089,33 +1182,12 @@ index 91a6c97..3587c60 100644
 +
 +static void language_init(void) {
 +    if (g_language[0]) return;
-+    if (FILE* f = std::fopen("launcher-language.txt", "rb")) {
-+        char buf[16] = {0};
-+        size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
-+        std::fclose(f);
-+        buf[n] = 0;
-+        if (!std::strncmp(buf, "pt", 2)) { language_set_internal("pt"); return; }
-+        if (!std::strncmp(buf, "en", 2)) { language_set_internal("en"); return; }
-+    }
-+#if defined(_WIN32)
-+    wchar_t loc[85] = {0};
-+    if (GetUserDefaultLocaleName(loc, 85) > 0 && loc[0] == L'p' && loc[1] == L't') {
-+        language_set_internal("pt");
-+        return;
-+    }
-+#endif
-+    if (!std::strncmp(RECOMP_UI_LANGUAGE, "pt", 2)) { language_set_internal("pt"); return; }
++    // English only; RECOMP_UI_LANGUAGE can still pick another table at build time.
 +    if (!std::strncmp(RECOMP_UI_LANGUAGE, "it", 2)) { language_set_internal("it"); return; }
 +    language_set_internal("en");
 +}
 +
-+void launcher_i18n_set_language(const char* lang) {
-+    language_set_internal(lang);
-+    if (FILE* f = std::fopen("launcher-language.txt", "wb")) {
-+        std::fputs(g_language, f);
-+        std::fclose(f);
-+    }
-+}
++void launcher_i18n_set_language(const char* lang) { language_set_internal(lang); }
 +
  const char* launcher_i18n_language(void) {
 -    return RECOMP_UI_LANGUAGE;
