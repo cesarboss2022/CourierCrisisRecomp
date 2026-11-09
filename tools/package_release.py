@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Pack, check, sign and publish a Windows release of Courier Crisis Recompiled.
 
 A release goes in two runs:

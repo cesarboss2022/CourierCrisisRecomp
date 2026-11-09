@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Start a packed release as a player would and write whether it ran, for package_release.py --publish.
 
 The package is copied first and only the copy is tested and named by its digest. It is unpacked into a folder of its

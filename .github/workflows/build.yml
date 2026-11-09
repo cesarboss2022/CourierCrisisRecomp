@@ -60,7 +60,7 @@ jobs:
           for f in src/mods/*.c; do
             clang -fsyntax-only -Wall -I psxrecomp/runtime/include -I recomp-ui/src "$f"
           done
-          python -c "import json,tomllib;[json.load(open(f)) for f in ('.recomp.json','catalog_identity.json','aot/overlays.json');tomllib.load(open('game.toml','rb'));tomllib.load(open('packaging/release.toml','rb'))"
+          python tools/check_metadata.py
       - name: Compile the runtime without the game
         run: |
           ccache --zero-stats
