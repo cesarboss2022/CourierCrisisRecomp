@@ -11,12 +11,14 @@ A fix ships as a new release.
 
 ## Verifying a Download
 
-The portable ZIP has a Sigstore bundle (`.sigstore.json`) signed by the maintainer's
-account. GitHub shows each file's SHA-256 beside it. To check the file:
+The portable ZIP has a Sigstore bundle (`.sigstore.json`) signed with the maintainer's GitHub
+account (`cesarboss2022`). GitHub shows each file's SHA-256 beside it. To check the file:
 
 ```
-uvx sigstore verify identity --cert-identity <the maintainer's account> --cert-oidc-issuer https://accounts.google.com --bundle CourierCrisisRecomp-win-Portable.zip.sigstore.json CourierCrisisRecomp-win-Portable.zip
+uvx sigstore verify identity --cert-identity 97560413+cesarboss2022@users.noreply.github.com --cert-oidc-issuer https://github.com/login/oauth --bundle CourierCrisisRecomp-win-Portable.zip.sigstore.json CourierCrisisRecomp-win-Portable.zip
 ```
+
+With cosign: `cosign verify-blob --bundle CourierCrisisRecomp-win-Portable.zip.sigstore.json --certificate-identity 97560413+cesarboss2022@users.noreply.github.com --certificate-oidc-issuer https://github.com/login/oauth CourierCrisisRecomp-win-Portable.zip`
 
 The executable is not code-signed, so Windows SmartScreen may warn on first start.
 
