@@ -1,6 +1,6 @@
 {
   "$schema": "https://recomp.fyi/schema/v1.json",
-  "game": "CourierCrisis",
+  "game": "Courier Crisis Recompiled",
   "system": "PS1",
   "type": "recomp",
   "toolchain": "psxrecomp",

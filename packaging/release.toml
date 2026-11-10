@@ -4,7 +4,7 @@ schema = 1
 
 [product]
 name = "couriercrisis"
-display_name = "CourierCrisis"
+display_name = "Courier Crisis Recompiled"
 exe_name = "CourierCrisis_Recompiled"
 version_file = "VERSION"
 

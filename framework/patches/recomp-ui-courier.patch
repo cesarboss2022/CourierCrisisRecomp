@@ -1,6 +1,6 @@
 diff --git a/src/common/backends/imgui/launcher_courier.h b/src/common/backends/imgui/launcher_courier.h
 new file mode 100644
-index 0000000..ff32ce5
+index 0000000..5fa7e24
 --- /dev/null
 +++ b/src/common/backends/imgui/launcher_courier.h
 @@ -0,0 +1,688 @@
@@ -645,9 +645,9 @@ index 0000000..ff32ce5
 +        ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
 +        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
 +        ImGui::TextWrapped("%s", launcher_i18n_pair(
-+            "A native PC port of Courier Crisis (PlayStation, 1999) made by recompiling the game with PSXRecomp. "
++            "A native PC port of Courier Crisis (PlayStation, 1997) made by recompiling the game with PSXRecomp. "
 +            "No game data is included: you bring your own disc.",
-+            "Uma versão nativa para PC do Courier Crisis (PlayStation, 1999), feita ao recompilar o jogo com o PSXRecomp. "
++            "Uma versão nativa para PC do Courier Crisis (PlayStation, 1997), feita ao recompilar o jogo com o PSXRecomp. "
 +            "Nenhum dado do jogo vem junto: você usa o seu próprio disco."));
 +        ImGui::PopTextWrapPos();
 +        ImGui::PopStyleColor();

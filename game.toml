@@ -2,7 +2,7 @@
 # The disc is never stored here: build.ps1 -Disc <path> extracts what it needs.
 
 [game]
-name = "CourierCrisis"
+name = "Courier Crisis Recompiled"
 id = "SLUS-00442"
 players = 1
 exe = "disc/SLUS_004.42"
@@ -106,6 +106,8 @@ guest_cycle_scale_gate = [
 
 [controller]
 default_mode = "digital"
+# Stick dead zone: 6553 of 32767, about 20%.
+deadzone = 6553
 
 # Online mount gate: digests + track count + optional TOC fingerprint
 # (see docs/NETPLAY.md).

@@ -2,6 +2,21 @@
 
 What changed in each release.
 
+## v0.2.1
+
+### Enhancements
+
+- New launcher page, Enhancements: three profiles (Original, Recommended, Maximum) and every picture, motion, audio and filter option as a card with a plain description. The page shows which profile is active
+- New Help page in the launcher, with how to start, what to do when something goes wrong, and links
+- Launcher shows the game's own icon and its full name, and explains errors such as an old executable that does not contain an enhancement
+- The in-game menu (F10) lists only options that apply at once, plus the video rows that relaunch when the menu closes, grouped like the Enhancements page. Options that need a restart are set in the launcher
+- Default stick dead zone is now 20% (was about 10%); a gamepad that already has a saved value keeps it
+
+### Known limitations
+
+- The campaign is not fully tested yet, see [STATUS.md](docs/STATUS.md)
+- A higher draw distance means more to draw: heavy scenes cost more CPU
+
 ## v0.2.0
 
 ### Enhancements

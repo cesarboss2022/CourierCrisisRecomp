@@ -6,7 +6,7 @@
 #include "psxrecomp_codegen_host.h"
 
 static const PsxrecompCodegenHostConfig kCodegenConfig = {
-    .display_name = "CourierCrisis",
+    .display_name = "Courier Crisis Recompiled",
     .project_root_env = "COURIERCRISISRECOMP_PROJECT_ROOT",
     .build_dir_env = "COURIERCRISISRECOMP_BUILD_DIR",
     .force_setup_env = "COURIERCRISISRECOMP_FORCE_SETUP",

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  A native PC recompilation of <b>Courier Crisis - The Saga of the Modern Fatalist</b> (PlayStation, 1999)
+  A native PC recompilation of <b>Courier Crisis - The Saga of the Modern Fatalist</b> (PlayStation, 1997)
 </p>
 
 <p align="center">
