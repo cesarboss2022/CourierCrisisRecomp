@@ -1529,6 +1529,19 @@ index 82955fa..398cfe5 100644
      g_ui = recomp_runtime_ui_create_standard(&cfg);
      if (!g_ui) { g_host = nullptr; return 0; }
      return 1;
+diff --git a/src/consoles/psx/psx_pad_binds.h b/src/consoles/psx/psx_pad_binds.h
+index 889b651..417f4ad 100644
+--- a/src/consoles/psx/psx_pad_binds.h
++++ b/src/consoles/psx/psx_pad_binds.h
+@@ -20,7 +20,7 @@ extern "C" {
+ #endif
+ 
+ #define RUI_PSX_PAD_MAX_KNOWN 16
+-#define RUI_PSX_PAD_DEFAULT_DEADZONE_PCT 10
++#define RUI_PSX_PAD_DEFAULT_DEADZONE_PCT 20
+ 
+ // Load input.ini (or seed defaults). `path` is the resolved input.ini path.
+ void rui_psx_pad_binds_init(const char* path);
 diff --git a/src/consoles/psx/psx_profile.h b/src/consoles/psx/psx_profile.h
 index 57f8332..40cff7f 100644
 --- a/src/consoles/psx/psx_profile.h
