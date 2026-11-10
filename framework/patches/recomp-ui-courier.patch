@@ -1295,7 +1295,7 @@ index 317e920..9f2fd7c 100644
          (name[1] == 's' || name[1] == 'S'))
          return launcher_theme_psx();
 diff --git a/src/consoles/psx/psx_menu_provider.cpp b/src/consoles/psx/psx_menu_provider.cpp
-index 82955fa..398cfe5 100644
+index 82955fa..ec085c6 100644
 --- a/src/consoles/psx/psx_menu_provider.cpp
 +++ b/src/consoles/psx/psx_menu_provider.cpp
 @@ -17,7 +17,17 @@
@@ -1316,7 +1316,7 @@ index 82955fa..398cfe5 100644
  
  namespace rui_psx {
  namespace {
-@@ -85,7 +95,169 @@ void apply_video() {
+@@ -85,7 +95,180 @@ void apply_video() {
      if (g_restart) status("Applies with a quick restart when you close the menu");
  }
  
@@ -1374,6 +1374,22 @@ index 82955fa..398cfe5 100644
 +
 +// Builds g_mod_rows and g_all_items (the stock extra rows first, then the mods).
 +// Both outlive the menu: the model keeps pointers into them.
++// Features whose options apply while the game runs: the plugin registers an
++// option-changed callback (see psx_mod_option_live_capable in the runtime).
++bool live_mod_feature(const char *pkg, const char *feat) {
++    static const char *const kLive[][2] = {
++        {"courier.enhancement.fps60", "fps60"},
++        {"courier.enhancement.smooth-motion", "smooth-motion"},
++        {"psx.enhancement.internal-resolution", "internal-resolution"},
++        {"psx.enhancement.image-filtering", "image-filtering"},
++        {"psx.enhancement.crt-filter", "crt-filter"},
++        {"psx.enhancement.post-processing", "post-processing"},
++    };
++    for (const auto &e : kLive)
++        if (!std::strcmp(e[0], pkg) && !std::strcmp(e[1], feat)) return true;
++    return false;
++}
++
 +void build_mod_rows(const RecompLauncherCModProvider *mods, size_t base_count) {
 +    g_mod_rows.clear();
 +    g_all_items.assign(g_extra, g_extra + base_count);
@@ -1385,16 +1401,11 @@ index 82955fa..398cfe5 100644
 +            if (!mods->feature_get(mods->ctx, i, &f)) continue;
 +            if (f.hidden || f.channel == RECOMP_MOD_CHANNEL_DEVELOPER) continue;
 +            if (!std::strcmp(f.group, "Advanced")) continue;
++            // Only options a running game can take at once belong in this menu. The
++            // switches and every restart-only option live on the launcher's
++            // Enhancements page.
++            if (!live_mod_feature(f.package_id, f.id)) continue;
 +            const std::string section = f.group[0] ? f.group : "Mods";
-+            ModRow sw;
-+            sw.kind = 0;
-+            sw.section = section;
-+            sw.label = f.name;
-+            sw.desc = std::string("Turn on or off (applies the next time the game starts). ") + f.description;
-+            sw.pkg = f.package_id;
-+            sw.feat = f.id;
-+            sw.feature_index = i;
-+            g_mod_rows.push_back(std::move(sw));
 +            for (int j = 0; j < f.option_count; ++j) {
 +                RecompLauncherCModOption o{};
 +                if (!mods->feature_option_get(mods->ctx, f.package_id, f.id, j, &o)) continue;
@@ -1486,7 +1497,7 @@ index 82955fa..398cfe5 100644
      if (is(item, RECOMP_RUNTIME_UI_KEY_FULLSCREEN)) *out = g_video.fullscreen;
      else if (is(item, "graphics.renderer")) *out = g_video.renderer;
      else if (is(item, "graphics.render_thread")) *out = g_video.render_thread;
-@@ -100,6 +272,10 @@ int cb_get(void *, const RecompRuntimeUiItem *item, int *out) {
+@@ -100,6 +283,10 @@ int cb_get(void *, const RecompRuntimeUiItem *item, int *out) {
  }
  
  int cb_set(void *, const RecompRuntimeUiItem *item, int v) {
@@ -1497,7 +1508,7 @@ index 82955fa..398cfe5 100644
      if (is(item, RECOMP_RUNTIME_UI_KEY_FULLSCREEN)) g_video.fullscreen = v;
      else if (is(item, "graphics.renderer")) {
          if (v < 0 || v >= g_renderers) return 0;
-@@ -168,6 +344,7 @@ void cb_visibility(void *, int open) {
+@@ -168,6 +355,7 @@ void cb_visibility(void *, int open) {
          recomp_runtime_ui_enter_section(g_ui, 0);
          recomp_runtime_ui_leave_section(g_ui);
          if (g_host->video_get) g_host->video_get(&g_video);
@@ -1505,7 +1516,7 @@ index 82955fa..398cfe5 100644
          g_restart = 0;
          const int mounted = g_host->disc_mounted ? g_host->disc_mounted() : 0;
          g_disc = mounted > 0 ? mounted : 1;
-@@ -222,7 +399,7 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
+@@ -222,7 +410,7 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
      RecompRuntimeUiStandardConfig cfg{};
      cfg.menu.title = "Game menu";
      cfg.menu.subtitle = g_subtitle;
@@ -1514,7 +1525,7 @@ index 82955fa..398cfe5 100644
      cfg.menu.accept_label = "Enter / Cross";
      cfg.menu.back_label = "Esc / Circle";
      cfg.menu.callbacks.get_value = cb_get;
-@@ -233,8 +410,12 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
+@@ -233,8 +421,12 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
      cfg.features = RECOMP_RUNTIME_UI_STANDARD_FULLSCREEN | RECOMP_RUNTIME_UI_STANDARD_PAUSE_IN_MENU |
                     RECOMP_RUNTIME_UI_STANDARD_RESUME | RECOMP_RUNTIME_UI_STANDARD_RETURN_TO_LAUNCHER |
                     RECOMP_RUNTIME_UI_STANDARD_QUIT;
