@@ -1295,14 +1295,15 @@ index 317e920..9f2fd7c 100644
          (name[1] == 's' || name[1] == 'S'))
          return launcher_theme_psx();
 diff --git a/src/consoles/psx/psx_menu_provider.cpp b/src/consoles/psx/psx_menu_provider.cpp
-index 82955fa..ec085c6 100644
+index 82955fa..ccf75cb 100644
 --- a/src/consoles/psx/psx_menu_provider.cpp
 +++ b/src/consoles/psx/psx_menu_provider.cpp
-@@ -17,7 +17,17 @@
+@@ -17,7 +17,18 @@
  #include "common/recomp_runtime_ui_internal.h"
  
  #include <cstdio>
 +#include <cstdlib>
++#include <algorithm>
  #include <cstring>
 +#include <string>
 +#include <vector>
@@ -1316,7 +1317,28 @@ index 82955fa..ec085c6 100644
  
  namespace rui_psx {
  namespace {
-@@ -85,7 +95,180 @@ void apply_video() {
+@@ -47,16 +58,16 @@ enum { RENDERER, RENDER_THREAD, PRESENT_THREAD,
+ #endif
+        DISC, INSERT };
+ RecompRuntimeUiItem g_extra[] = {
+-    {"graphics.renderer", "Graphics", "Renderer", "Applies with a restart when the menu closes.",
++    {"graphics.renderer", "Picture", "Renderer", "Applies with a restart when the menu closes.",
+      RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, kRenderers, 2, kRendererValues},
+-    {"graphics.render_thread", "Graphics", "Render thread",
++    {"graphics.render_thread", "Picture", "Render thread",
+      "Use a second CPU thread for OpenGL; restarts when this menu closes.",
+      RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, nullptr, 0, nullptr},
+-    {"graphics.present_thread", "Graphics", "Present thread",
++    {"graphics.present_thread", "Picture", "Present thread",
+      "Present OpenGL frames on another thread. Requires Render thread; restarts when this menu closes.",
+      RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, nullptr, 0, nullptr},
+ #ifdef PSX_HOST_VIDEO_HAS_VSYNC
+-    {"graphics.vsync", "Graphics", "VSync", "Driver synchronization and variable-refresh presentation.",
++    {"graphics.vsync", "Picture", "VSync", "Driver synchronization and variable-refresh presentation.",
+      RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1, kVsync, 3, kVsyncValues},
+ #endif
+     {"media.disc", "Disc", "Selected disc", "Choose a disc, then Insert disc and resume.",
+@@ -85,7 +96,198 @@ void apply_video() {
      if (g_restart) status("Applies with a quick restart when you close the menu");
  }
  
@@ -1390,6 +1412,20 @@ index 82955fa..ec085c6 100644
 +    return false;
 +}
 +
++// The launcher's Enhancements page names these sections; the in-game menu
++// uses the same ones, in the same order.
++const char *mod_section(const char *feat) {
++    if (!std::strcmp(feat, "fps60") || !std::strcmp(feat, "smooth-motion")) return "Motion";
++    if (!std::strcmp(feat, "internal-resolution")) return "Picture";
++    return "Filters and Effects";   // image filtering, CRT filter, post-processing
++}
++int section_rank(const char *s) {
++    static const char *const kOrder[] = {"Picture", "Motion", "Audio", "Filters and Effects", "Extras"};
++    for (int i = 0; i < 5; ++i)
++        if (s && !std::strcmp(s, kOrder[i])) return i;
++    return 5;   // Disc and anything else, last
++}
++
 +void build_mod_rows(const RecompLauncherCModProvider *mods, size_t base_count) {
 +    g_mod_rows.clear();
 +    g_all_items.assign(g_extra, g_extra + base_count);
@@ -1405,7 +1441,7 @@ index 82955fa..ec085c6 100644
 +            // switches and every restart-only option live on the launcher's
 +            // Enhancements page.
 +            if (!live_mod_feature(f.package_id, f.id)) continue;
-+            const std::string section = f.group[0] ? f.group : "Mods";
++            const std::string section = mod_section(f.id);
 +            for (int j = 0; j < f.option_count; ++j) {
 +                RecompLauncherCModOption o{};
 +                if (!mods->feature_option_get(mods->ctx, f.package_id, f.id, j, &o)) continue;
@@ -1465,6 +1501,10 @@ index 82955fa..ec085c6 100644
 +        it.choice_values = nullptr;
 +        g_all_items.push_back(it);
 +    }
++    std::stable_sort(g_all_items.begin(), g_all_items.end(),
++                     [](const RecompRuntimeUiItem &a, const RecompRuntimeUiItem &b) {
++                         return section_rank(a.section) < section_rank(b.section);
++                     });
 +    refresh_mod_rows();
 +}
 +
@@ -1497,7 +1537,7 @@ index 82955fa..ec085c6 100644
      if (is(item, RECOMP_RUNTIME_UI_KEY_FULLSCREEN)) *out = g_video.fullscreen;
      else if (is(item, "graphics.renderer")) *out = g_video.renderer;
      else if (is(item, "graphics.render_thread")) *out = g_video.render_thread;
-@@ -100,6 +283,10 @@ int cb_get(void *, const RecompRuntimeUiItem *item, int *out) {
+@@ -100,6 +302,10 @@ int cb_get(void *, const RecompRuntimeUiItem *item, int *out) {
  }
  
  int cb_set(void *, const RecompRuntimeUiItem *item, int v) {
@@ -1508,7 +1548,7 @@ index 82955fa..ec085c6 100644
      if (is(item, RECOMP_RUNTIME_UI_KEY_FULLSCREEN)) g_video.fullscreen = v;
      else if (is(item, "graphics.renderer")) {
          if (v < 0 || v >= g_renderers) return 0;
-@@ -168,6 +355,7 @@ void cb_visibility(void *, int open) {
+@@ -168,6 +374,7 @@ void cb_visibility(void *, int open) {
          recomp_runtime_ui_enter_section(g_ui, 0);
          recomp_runtime_ui_leave_section(g_ui);
          if (g_host->video_get) g_host->video_get(&g_video);
@@ -1516,7 +1556,7 @@ index 82955fa..ec085c6 100644
          g_restart = 0;
          const int mounted = g_host->disc_mounted ? g_host->disc_mounted() : 0;
          g_disc = mounted > 0 ? mounted : 1;
-@@ -222,7 +410,7 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
+@@ -222,7 +429,7 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
      RecompRuntimeUiStandardConfig cfg{};
      cfg.menu.title = "Game menu";
      cfg.menu.subtitle = g_subtitle;
@@ -1525,7 +1565,7 @@ index 82955fa..ec085c6 100644
      cfg.menu.accept_label = "Enter / Cross";
      cfg.menu.back_label = "Esc / Circle";
      cfg.menu.callbacks.get_value = cb_get;
-@@ -233,8 +421,12 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
+@@ -233,8 +440,12 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
      cfg.features = RECOMP_RUNTIME_UI_STANDARD_FULLSCREEN | RECOMP_RUNTIME_UI_STANDARD_PAUSE_IN_MENU |
                     RECOMP_RUNTIME_UI_STANDARD_RESUME | RECOMP_RUNTIME_UI_STANDARD_RETURN_TO_LAUNCHER |
                     RECOMP_RUNTIME_UI_STANDARD_QUIT;
