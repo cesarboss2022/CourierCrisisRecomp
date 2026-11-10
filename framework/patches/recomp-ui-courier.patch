@@ -1,6 +1,6 @@
 diff --git a/src/common/backends/imgui/launcher_courier.h b/src/common/backends/imgui/launcher_courier.h
 new file mode 100644
-index 0000000..c027d89
+index 0000000..ff32ce5
 --- /dev/null
 +++ b/src/common/backends/imgui/launcher_courier.h
 @@ -0,0 +1,688 @@
@@ -249,7 +249,7 @@ index 0000000..c027d89
 +    {CC_SM, "smooth-motion", 0, nullptr, nullptr}, {CC_IR, "internal-resolution", 1, "resolution", "5x"},
 +    {CC_IF, "image-filtering", 1, "dithering", "off"},
 +    {CC_PG, "pgxp", 1, "geometry", "true"}, {CC_PG, "pgxp", 1, "perspective", "true"},
-+    {CC_PG, "pgxp", 1, "cpu_mode", "true"}, {CC_EA, "enhanced-audio", 1, nullptr, nullptr},
++    {CC_PG, "pgxp", 1, "cpu_mode", "true"}, {CC_EA, "enhanced-audio", 0, nullptr, nullptr},
 +};
 +static const CcStep kProfileMaximum[] = {
 +    {CC_W, "widescreen", 1, "aspect", "16:9"}, {CC_WE, "wide-edges", 1, nullptr, nullptr},
